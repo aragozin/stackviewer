@@ -5,6 +5,7 @@ import static java.util.Arrays.asList;
 import java.awt.BorderLayout;
 import java.io.File;
 
+import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.JEditorPane;
 import javax.swing.JLabel;
@@ -61,36 +62,30 @@ public class AnalyzerPane extends JPanel {
     
     private class ClassificationPane extends JPanel {
         
-        JLabel label = new JLabel("Classification");
         JEditorPane editor = new JEditorPane();
         
         public ClassificationPane() {
-            Box box = Box.createVerticalBox();
-            box.add(label);
-            box.add(editor);
-            add(box);
+            setLayout(new BorderLayout());
+            add(editor, BorderLayout.CENTER);
+            setBorder(BorderFactory.createTitledBorder("Classification"));
         }        
     }
 
     private class BarPane extends JPanel {
         
-        JLabel label = new JLabel("Distribution");
-        
         public BarPane() {
             Box box = Box.createVerticalBox();
-            box.add(label);
             add(box);
+            setBorder(BorderFactory.createTitledBorder("Distribution"));
         }        
     }
 
     private class ExplorerPane extends JPanel {
         
-        JLabel label = new JLabel("Samples");
-        
         public ExplorerPane() {
             Box box = Box.createVerticalBox();
-            box.add(label);
             add(box);
+            setBorder(BorderFactory.createTitledBorder("Samples"));
         }        
     }    
 }

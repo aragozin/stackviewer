@@ -1,25 +1,15 @@
 package org.gridkit.sjk.ssa;
 
-import java.awt.Component;
+import java.awt.Dimension;
 
-import javax.swing.JPanel;
+import javax.swing.JComponent;
+import javax.swing.JScrollPane;
 
 public class Stacker {
 
-    public static void stackLeft(JPanel panel, Component child) {
-        
+    public static JComponent scroll(JComponent comp, int width, int height) {
+        JScrollPane pane = new JScrollPane(comp);
+        pane.setPreferredSize(new Dimension(width, height));
+        return pane;        
     }
-
-    public static void stackRight(JPanel panel, Component child) {
-        
-    }
-
-    public static void stackTop(JPanel panel, Component child) {
-        
-    }
-
-    public static void stackBottom(JPanel panel, Component child) {
-        
-    }
-    
 }
