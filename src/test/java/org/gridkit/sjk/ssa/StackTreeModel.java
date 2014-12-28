@@ -81,6 +81,11 @@ public class StackTreeModel extends DefaultTreeModel {
         }
         
         @Override
+        public StackTraceElement[] getPath() {
+            return path;
+        }
+
+        @Override
         public StackTraceElement getFrame() {
             return path.length == 0 ? null : path[path.length - 1];
         }
@@ -192,6 +197,8 @@ public class StackTreeModel extends DefaultTreeModel {
     
     public interface FrameInfo {
         
+        StackTraceElement[] getPath();
+        
         StackTraceElement getFrame();
         
         int getTreeHitCount();
@@ -208,4 +215,10 @@ public class StackTreeModel extends DefaultTreeModel {
             return Long.signum(o2.getHitCount() - o1.getHitCount());
         }
     }
+    
+    public interface StackTraceFilter {
+        
+        public boolean evaluate(FrameInfo frameInfo);
+        
+    }    
 }

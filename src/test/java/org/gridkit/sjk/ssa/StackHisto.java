@@ -1,6 +1,7 @@
 package org.gridkit.sjk.ssa;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -45,6 +46,10 @@ public class StackHisto {
     
     public SiteInfo get(StackTraceElement frame) {
         return histo.get(frame);
+    }
+    
+    public Collection<SiteInfo> getAllSites() {
+        return histo.values();
     }
     
     public int getTraceCount() {

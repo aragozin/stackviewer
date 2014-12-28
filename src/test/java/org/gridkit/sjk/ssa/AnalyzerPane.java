@@ -7,6 +7,7 @@ import static javax.swing.BorderFactory.createEtchedBorder;
 
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
@@ -14,17 +15,24 @@ import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
+import java.util.Comparator;
+import java.util.regex.Pattern;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
+import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JEditorPane;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JTable;
 import javax.swing.JToggleButton;
 import javax.swing.JTree;
+import javax.swing.SwingUtilities;
 import javax.swing.ToolTipManager;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.tree.DefaultTreeCellRenderer;
 
 import org.gridkit.jvmtool.StackTraceReader;
@@ -33,10 +41,26 @@ import org.gridkit.sjk.ssa.MultiSplitLayout.Leaf;
 import org.gridkit.sjk.ssa.MultiSplitLayout.Node;
 import org.gridkit.sjk.ssa.MultiSplitLayout.Split;
 import org.gridkit.sjk.ssa.StackTreeModel.FrameInfo;
+import org.jdesktop.swingx.JXSearchField;
+import org.jdesktop.swingx.JXTable;
+import org.jdesktop.swingx.decorator.ToolTipHighlighter;
+import org.jdesktop.swingx.painter.MattePainter;
+import org.jdesktop.swingx.painter.Painter;
+import org.jdesktop.swingx.renderer.DefaultTableRenderer;
+import org.jdesktop.swingx.renderer.StringValue;
+import org.jdesktop.swingx.sort.RowFilters;
 
 @SuppressWarnings("serial")
 public class AnalyzerPane extends JPanel {
 
+    private static final NaturalComparator NATURAL_COMPARATOR = new NaturalComparator();
+    private static final PercentFormater PERCENT_FORMATER = new PercentFormater();
+    private static final StringValue TO_STRING = new StringValue() {
+        @Override
+        public String getString(Object value) {
+            return value == null ? null : value.toString();
+        }
+    };
     
     private StackTraceSource source;
     private StackTree tree;
@@ -108,7 +132,9 @@ public class AnalyzerPane extends JPanel {
             if (!reader.loadNext()) {
                 break;
             }
-        }        
+        }
+        explorerPane.frameHisto.histoModel.setHisto(histo);
+        explorerPane.frameHisto.table.packAll();
     }
 
     public void setClassificationFile(File file) {
@@ -138,7 +164,7 @@ public class AnalyzerPane extends JPanel {
     private class ExplorerPane extends JPanel {
         
         StackTreePane stackTree = new StackTreePane();
-        JLabel frameHisto = new JLabel("HISTO");
+        FrameHistoPane frameHisto = new FrameHistoPane();
         JPanel cards = new JPanel();
         JComboBox categoryCombo = new JComboBox();
         JToggleButton treeButton = new JToggleButton("Tree");
@@ -152,7 +178,8 @@ public class AnalyzerPane extends JPanel {
             controls.add(categoryLabel);
             controls.add(Box.createHorizontalStrut(5));
             controls.add(categoryCombo);
-            controls.add(Box.createHorizontalGlue());
+            controls.add(Box.createHorizontalStrut(5));
+//            controls.add(Box.createHorizontalGlue());
             controls.add(treeButton);
             controls.add(histoButton);
             controls.setBorder(createCompoundBorder(createEtchedBorder(), createEmptyBorder(3, 3, 3, 3)));
@@ -210,6 +237,7 @@ public class AnalyzerPane extends JPanel {
         
         public StackTreePane() {
             tree.setRootVisible(false);
+            tree.setShowsRootHandles(true);
             tree.setModel(treeModel);
             tree.setMinimumSize(new Dimension(100, 100));
             tree.setCellRenderer(new StackFrameTreeNodeRenderer());
@@ -218,6 +246,106 @@ public class AnalyzerPane extends JPanel {
             add(new JScrollPane(tree), BorderLayout.CENTER);
         }        
     }    
+    
+    private class FrameHistoPane extends JPanel {
+     
+        private JXTable table = new JXTable();
+        private MatchingTextHighlighter highlighter = new MatchingTextHighlighter(newHighlightPainter());
+        private JXSearchField filterField = new JXSearchField();
+        private JButton unfilterButton = new JButton("x");
+        private String activeFilter = "";
+        
+        private FrameHistoModel histoModel = new FrameHistoModel();
+        
+        public FrameHistoPane() {
+            table.setModel(histoModel);
+            ToolTipManager.sharedInstance().registerComponent(table);
+            setLayout(new BorderLayout());
+            add(new JScrollPane(table), BorderLayout.CENTER);
+            table.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
+            
+            table.getColumnExt(0).setCellRenderer(new DefaultTableRenderer(PERCENT_FORMATER, JLabel.RIGHT));
+            table.getColumnExt(0).setComparator(NATURAL_COMPARATOR);
+            table.getColumnExt(1).setComparator(NATURAL_COMPARATOR);
+            table.getColumnExt(2).setComparator(NATURAL_COMPARATOR);
+            table.getColumnExt(3).addHighlighter(new ToolTipHighlighter(TO_STRING));
+            
+            table.setEditable(false);
+            
+            table.addHighlighter(highlighter);
+            
+            add(filterField, BorderLayout.SOUTH);
+            
+            unfilterButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            filterField.setText("");
+                            updateFilter();
+                        }
+                    });                    
+                }
+            });
+            
+            unfilterButton.setEnabled(false);
+            
+            filterField.getDocument().addDocumentListener(new DocumentListener() {
+                
+                @Override
+                public void removeUpdate(DocumentEvent e) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            updateFilter();
+                        }
+                    });
+                }
+                
+                @Override
+                public void insertUpdate(DocumentEvent e) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            updateFilter();
+                        }
+                    });
+                }
+                
+                @Override
+                public void changedUpdate(DocumentEvent e) {
+                    updateFilterLater();
+                }
+
+                private void updateFilterLater() {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            updateFilter();
+                        }
+                    });
+                }
+            });
+        }
+
+        private void updateFilter() {
+            String text = filterField.getText().trim();
+            if (!text.equals(activeFilter)) {
+                if (text.length() > 0) {
+                    table.setRowFilter(RowFilters.regexFilter(".*" + Pattern.quote(text) + ".*", 3));
+                    unfilterButton.setEnabled(true);
+                    highlighter.setMatchPatter(Pattern.compile(Pattern.quote(text)));
+                }
+                else {
+                    table.setRowFilter(null);
+                    unfilterButton.setEnabled(false);
+                    highlighter.setMatchPatter(null);
+                }
+            }            
+            activeFilter = text;
+        }
+    }
     
     private class StackFrameTreeNodeRenderer extends DefaultTreeCellRenderer {
         
@@ -267,7 +395,19 @@ public class AnalyzerPane extends JPanel {
             return this;
         }
     }
+    
+    private static class PercentFormater extends DecimalFormat implements StringValue {
 
+        public PercentFormater() {
+            super("#0.0%");
+        }
+        
+        @Override
+        public String getString(Object value) {
+            return value == null ? "" : format(value);
+        }
+    }
+    
     static String shortName(String className) {
         int n = className.lastIndexOf('.');
         if (n >= 0) {
@@ -276,6 +416,25 @@ public class AnalyzerPane extends JPanel {
         }
         else {
             return className;
+        }
+    }
+    
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    private static Painter<JLabel> newHighlightPainter() {
+        return (Painter)new MattePainter(Color.YELLOW);
+    }
+    
+    private static class NaturalComparator implements Comparator<Comparable<Object>> {
+
+        @Override
+        public int compare(Comparable<Object> o1, Comparable<Object> o2) {
+            if (o1 == null) {
+                return o2 == null ? 0 : -1;
+            }
+            else if (o2 == null) {
+                return 1;
+            }
+            return o1.compareTo(o2);
         }
     }
 }
