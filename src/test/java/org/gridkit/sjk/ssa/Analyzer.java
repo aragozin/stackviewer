@@ -23,8 +23,8 @@ public class Analyzer {
             @Override
             public StackTraceReader getReader() {
                 try {
-//                    return StackTraceCodec.newReader(new FileInputStream("C:/WarZone/spaces/blog/blog-docs/_tmp/case1.stp"));
-                    return StackTraceCodec.newReader(new FileInputStream("C:/WarZone/docs/_tmp/case1.stp"));
+                    return StackTraceCodec.newReader(new FileInputStream("C:/WarZone/spaces/blog/blog-docs/_tmp/case1.stp"));
+//                    return StackTraceCodec.newReader(new FileInputStream("C:/WarZone/docs/_tmp/case1.stp"));
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -39,8 +39,6 @@ public class Analyzer {
         AnalyzerPane pane = new AnalyzerPane();
         pane.setTraceDump(source);
 
-//        UIManager.setLookAndFeel("com.sun.java.swing.plaf.nimbus.NimbusLookAndFeel");
-        
         JDialog dialog = new JDialog();
         dialog.add(pane);
         dialog.setTitle("Stack Sample Analyzer");
@@ -49,5 +47,5 @@ public class Analyzer {
         dialog.setBounds(200, 200, 400, 300);
 //        dialog.pack();        
         dialog.setVisible(true);        
-    }    
+    }     
 }
