@@ -37,6 +37,7 @@ class ClassificationCodec {
         if (line.startsWith("[") && line.endsWith("]")) {
             String name = line.substring(1, line.length() - 1);
             Classification c = root.newClassification(name);
+            lastClassification = c;
             return new FilterParser(c.getRootFilter());
         }
         else if (line.startsWith("+")) {

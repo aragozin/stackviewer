@@ -10,10 +10,12 @@ import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.ScrollPane;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.IOException;
+import java.io.Reader;
 import java.text.DecimalFormat;
 import java.util.Comparator;
 import java.util.regex.Pattern;
@@ -22,7 +24,6 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
-import javax.swing.JEditorPane;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -36,6 +37,8 @@ import javax.swing.event.DocumentListener;
 import javax.swing.tree.DefaultTreeCellRenderer;
 
 import org.gridkit.jvmtool.StackTraceReader;
+import org.gridkit.sjk.ssa.ClassifierModel.CommonNode;
+import org.gridkit.sjk.ssa.ClassifierModel.RootNode;
 import org.gridkit.sjk.ssa.MultiSplitLayout.Divider;
 import org.gridkit.sjk.ssa.MultiSplitLayout.Leaf;
 import org.gridkit.sjk.ssa.MultiSplitLayout.Node;
@@ -105,6 +108,14 @@ public class AnalyzerPane extends JPanel {
             throw new RuntimeException(e);
         }
     }
+    
+    public void loadClassification(Reader reader) {
+        classificationPane.model.reset();
+        RootNode root = classificationPane.model.getRoot();
+        ClassificationCodec codec = new ClassificationCodec(root);
+        codec.parse(reader); 
+        classificationPane.model.reload();
+    }
 
     private void rebuildTree() throws IOException {
         tree = new StackTree();
@@ -143,11 +154,19 @@ public class AnalyzerPane extends JPanel {
     
     private class ClassificationPane extends JPanel {
         
-        JEditorPane editor = new JEditorPane();
+        JTree tree = new JTree();
+        ClassifierModel model = new ClassifierModel();
         
         public ClassificationPane() {
-            setLayout(new BorderLayout());
-            add(editor, BorderLayout.CENTER);
+            tree.setModel(model);
+            tree.setRootVisible(false);
+            tree.setShowsRootHandles(true);
+            tree.setCellRenderer(new ClassificationNodeRenderer());
+            
+            ScrollPane pane = new ScrollPane();
+            pane.add(tree);
+            setLayout(new BorderLayout());           
+            add(pane, BorderLayout.CENTER);
             setBorder(BorderFactory.createTitledBorder("Classification"));
         }        
     }
@@ -344,6 +363,22 @@ public class AnalyzerPane extends JPanel {
                 }
             }            
             activeFilter = text;
+        }
+    }
+    
+    private class ClassificationNodeRenderer extends DefaultTreeCellRenderer {
+        
+        @Override
+        public Component getTreeCellRendererComponent(JTree tree, Object value, boolean selected, boolean expanded, boolean leaf, int row, boolean hasFocus) {
+            super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus);
+            setIcon(null);
+            
+            if (value instanceof ClassifierModel.CommonNode) {
+                CommonNode node = (CommonNode) value;
+                setText(node.getHtmlCaption());
+            }
+            
+            return this;
         }
     }
     

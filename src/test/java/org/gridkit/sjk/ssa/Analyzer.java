@@ -1,7 +1,10 @@
 package org.gridkit.sjk.ssa;
 
 import java.awt.Dialog.ModalityType;
+import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 
 import javax.swing.JDialog;
@@ -34,11 +37,14 @@ public class Analyzer {
     }
     
     @Test
-    public void start() throws ClassNotFoundException, InstantiationException, IllegalAccessException, UnsupportedLookAndFeelException {
+    public void start() throws ClassNotFoundException, InstantiationException, IllegalAccessException, UnsupportedLookAndFeelException, FileNotFoundException {
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+//        UIManager.setLookAndFeel("com.sun.java.swing.plaf.windows.WindowsClassicLookAndFeel");
+//        UIManager.setLookAndFeel("com.sun.java.swing.plaf.nimbus.NimbusLookAndFeel");
 
         AnalyzerPane pane = new AnalyzerPane();
         pane.setTraceDump(source);
+        pane.loadClassification(new FileReader("src/test/resources/jboss-seam.scf"));
 
         JDialog dialog = new JDialog();
         dialog.add(pane);

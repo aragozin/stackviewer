@@ -33,6 +33,12 @@ public class ClassifierModel extends DefaultTreeModel {
         return (RootNode)super.getRoot();
     }
 
+
+    public void reset() {
+        RootNode node = new RootNode();
+        setRoot(node);
+    }        
+    
     public void load(Reader source) {
         
     }
@@ -41,7 +47,7 @@ public class ClassifierModel extends DefaultTreeModel {
         
     }
     
-    public static class RootNode extends NodeWithComments {
+    public static class RootNode extends CommonNode {
         
         private Map<String, Classification> sections = new HashMap<String, Classification>();
         
@@ -54,9 +60,14 @@ public class ClassifierModel extends DefaultTreeModel {
             add(c);
             return c;
         }
+
+        @Override
+        public String getHtmlCaption() {
+            return "";
+        }
     }
     
-    public static class Classification extends NodeWithComments {
+    public static class Classification extends CommonNode {
 
         private String name;
         
@@ -84,11 +95,20 @@ public class ClassifierModel extends DefaultTreeModel {
                 add(sc);
                 return sc;
             }
+        }
+
+        @Override
+        public String getHtmlCaption() {
+            return "<html><b>" + name + "</b></html>";
         }        
     }
 
     public static class RootFilter extends ConjunctionNode {
-        
+
+        @Override
+        public String getHtmlCaption() {
+            return "<html><i>filter</i></html>";
+        }        
     }
     
     public static class Subclass extends ConjunctionNode {
@@ -99,19 +119,27 @@ public class ClassifierModel extends DefaultTreeModel {
             this.name = name;
         }
 
+        @Override
+        public String getHtmlCaption() {
+            return "<html>" + name + "</html>";
+        }        
     }
 
-    public static class FramePattern extends NodeWithComments {
+    public static class FramePattern extends CommonNode {
         
         private String pattern;
         
         public FramePattern(String pattern) {
             this.pattern = pattern;
         }
-        
+
+        @Override
+        public String getHtmlCaption() {
+            return "<html><span style=\"font=monospace\">" + pattern + "</span></html>";
+        }                
     }
 
-    public static class CompositePredicateNode extends NodeWithComments {
+    public static abstract class CompositePredicateNode extends CommonNode {
 
         public DisjunctionNode newDisjunction() {
             DisjunctionNode node = new DisjunctionNode();
@@ -140,14 +168,22 @@ public class ClassifierModel extends DefaultTreeModel {
     }
 
     public static class DisjunctionNode extends CompositePredicateNode {
-        
+
+        @Override
+        public String getHtmlCaption() {
+            return "<html><span style=\"color: #B44\"><b>AND</b></span></html>";
+        }
     }
 
     public static class ConjunctionNode extends CompositePredicateNode {
-        
+
+        @Override
+        public String getHtmlCaption() {
+            return "<html><span style=\"color: #B44\"><b>OR</b></span></html>";
+        }
     }
 
-    public static class LastQuantor extends NodeWithComments {
+    public static class LastQuantor extends CommonNode {
 
         private StackFragment stackFragment = new StackFragment();
         private FollowPredicate followPredicate = new FollowPredicate();
@@ -168,12 +204,21 @@ public class ClassifierModel extends DefaultTreeModel {
         public CompositePredicateNode getPredicate() {
             return followPredicate;
         }
+        
+        @Override
+        public String getHtmlCaption() {
+            return "<html><span style=\"color: #B44\"><b>LAST</b></span></html>";
+        }        
     }
 
-    public static class StackFragment extends NodeWithComments {
+    public static class StackFragment extends CommonNode {
 
         private List<FramePattern> pattern = new ArrayList<FramePattern>();
-        
+
+        @Override
+        public String getHtmlCaption() {
+            return "<html><i>fragment</i></html>";
+        }        
     }
     
     public static class FollowPredicate extends ConjunctionNode {
@@ -183,15 +228,34 @@ public class ClassifierModel extends DefaultTreeModel {
         public boolean isNegative() {
             return negative;
         }
+
+        public String getHtmlCaption() {
+            return negative 
+                    ? "<html><i>not followed by</i></html>" 
+                    : "<html><i>followed by</i></html>";
+        }        
     }
 
-    public static class LastCommentNode extends NodeWithComments {
-        
+    public static class LastCommentNode extends CommonNode {
+
+        @Override
+        public String getHtmlCaption() {
+            return "";
+        }
     }    
     
-    public static class NodeWithComments extends DefaultMutableTreeNode {
+    public static abstract class CommonNode extends DefaultMutableTreeNode {
         
         String comment = "";
         
-    }    
+        public String getComment() {
+            return comment;
+        }
+        
+        public abstract String getHtmlCaption();
+        
+        public String getGlyphName() {
+            return null;
+        }
+    }
 }
