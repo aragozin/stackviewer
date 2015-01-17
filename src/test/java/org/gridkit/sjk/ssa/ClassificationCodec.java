@@ -4,10 +4,6 @@ import java.io.Reader;
 
 import org.gridkit.jvmtool.Cascade;
 import org.gridkit.jvmtool.StackFilterParser;
-import org.gridkit.jvmtool.StackFilterParser.AllNode;
-import org.gridkit.jvmtool.StackFilterParser.AnyNode;
-import org.gridkit.jvmtool.StackFilterParser.LastNode;
-import org.gridkit.jvmtool.StackFilterParser.LiteralNode;
 import org.gridkit.sjk.ssa.ClassifierModel.Classification;
 import org.gridkit.sjk.ssa.ClassifierModel.CompositePredicateNode;
 import org.gridkit.sjk.ssa.ClassifierModel.ConjunctionNode;
@@ -36,12 +32,12 @@ class ClassificationCodec {
     }
     
     @Cascade.Section
-    public ConjunctionParser section(String line) {
+    public FilterParser section(String line) {
         line = line.trim();
         if (line.startsWith("[") && line.endsWith("]")) {
             String name = line.substring(1, line.length() - 1);
             Classification c = root.newClassification(name);
-            return new ConjunctionParser(c.getRootFilter());
+            return new FilterParser(c.getRootFilter());
         }
         else if (line.startsWith("+")) {
             String name = line.substring(1);
@@ -49,14 +45,20 @@ class ClassificationCodec {
                 throw new IllegalArgumentException("Subcategory should follow a category section: " + name);
             }
             Subclass sc = lastClassification.newSubclass(name);
-            return new ConjunctionParser(sc);
+            return new FilterParser(sc);
         }
         else {
             throw new IllegalArgumentException("Expected section name: " + line);
         }
     }
     
-    public class FilterParser {
+    public abstract class SectionParser {
+        
+        public abstract SectionParser child(String line);
+        
+    }
+    
+    public class FilterParser extends SectionParser {
         
         CompositePredicateNode node;
         
@@ -65,7 +67,7 @@ class ClassificationCodec {
         }
         
         @Cascade.Section
-        public FilterParser child(String line) {
+        public SectionParser child(String line) {
             if (line.startsWith("!")) {
                 String dir = normalizeDirective(line);
                 if (dir.equals(D_REQUIRE)) {
@@ -78,19 +80,66 @@ class ClassificationCodec {
                 }
                 else if (dir.equals(D_LAST)) {
                     LastQuantor subnode = node.newLastQuantor();
-                    return new LastParser(subnode);
+                    return new LastQuantorParser(subnode);
                 }
                 else {
                     throw new IllegalArgumentException("Enexpected directive: " + dir);
                 }
             }
             else {
-                
-                subnodes.add(node);
-                return node;
+                node.newFramePattern(line);
+                return null;
             }
         }
     }
+
+    public class LastQuantorParser extends SectionParser {
+        
+        LastQuantor node;
+        boolean hasTarget = false;
+        boolean hasPredicate = false;
+        
+        public LastQuantorParser(LastQuantor node) {
+            this.node = node;
+        }
+        
+        @Cascade.Section
+        public SectionParser child(String line) {
+            if (line.startsWith("!")) {
+                String dir = normalizeDirective(line);
+
+                if (hasPredicate) {
+                    throw new IllegalArgumentException("Could be only one directive");
+                }
+                if (!hasTarget) {
+                    throw new IllegalArgumentException("Matcher is required");
+                }
+
+                hasPredicate = true;
+                if (dir.equals(D_FOLLOWED)) {
+                    return new FilterParser(node.getPredicate());
+                }
+                else if (dir.equals(D_NOT_FOLLOWED)) {
+                    node.setNotFollowedSemantic(true);
+                    return new FilterParser(node.getPredicate());
+                }
+                else {
+                    throw new IllegalArgumentException("Enexpected directive: " + dir);
+                }
+            }
+            else {
+                if (hasPredicate) {
+                    throw new IllegalArgumentException("Should be no nested line after predicate directive");
+                }
+                
+                hasTarget = true;
+                node.addFramePattern(line);
+                
+                return null;
+            }
+        }
+    }
+    
     
     static String normalizeDirective(String line) {
         return line.substring(1).replace("\\s+", " ").toUpperCase().trim();

@@ -103,6 +103,12 @@ public class ClassifierModel extends DefaultTreeModel {
 
     public static class FramePattern extends NodeWithComments {
         
+        private String pattern;
+        
+        public FramePattern(String pattern) {
+            this.pattern = pattern;
+        }
+        
     }
 
     public static class CompositePredicateNode extends NodeWithComments {
@@ -115,6 +121,12 @@ public class ClassifierModel extends DefaultTreeModel {
 
         public ConjunctionNode newConjunction() {
             ConjunctionNode node = new ConjunctionNode();
+            add(node);
+            return node;
+        }
+
+        public FramePattern newFramePattern(String pattern) {
+            FramePattern node = new FramePattern(pattern);
             add(node);
             return node;
         }
@@ -143,7 +155,19 @@ public class ClassifierModel extends DefaultTreeModel {
         public LastQuantor() {
             add(stackFragment);
             add(followPredicate);
-        }        
+        }
+        
+        public void addFramePattern(String pattern) {
+            stackFragment.add(new FramePattern(pattern));
+        }
+
+        public void setNotFollowedSemantic(boolean negated) {
+            followPredicate.negative = negated;
+        }
+        
+        public CompositePredicateNode getPredicate() {
+            return followPredicate;
+        }
     }
 
     public static class StackFragment extends NodeWithComments {
@@ -169,17 +193,5 @@ public class ClassifierModel extends DefaultTreeModel {
         
         String comment = "";
         
-    }
-    
-    public void measure_allocation() {
-        com.sun.management.ThreadMXBean mbean = (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
-        long id = Thread.currentThread().getId();
-        long before = mbean.getThreadAllocatedBytes(id);
-        
-        run_test();
-
-        long after = mbean.getThreadAllocatedBytes(id);
-        
-        long allocation = after-before;
-    }
+    }    
 }
