@@ -19,7 +19,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-package org.gridkit.sjk.ssa;
+package org.gridkit.sjk.ssa.ui;
 
 import java.awt.Component;
 import java.awt.Container;

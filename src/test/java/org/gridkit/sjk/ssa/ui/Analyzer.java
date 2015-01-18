@@ -1,4 +1,4 @@
-package org.gridkit.sjk.ssa;
+package org.gridkit.sjk.ssa.ui;
 
 import java.awt.Dialog.ModalityType;
 import java.io.File;
@@ -51,7 +51,7 @@ public class Analyzer {
         dialog.setTitle("Stack Sample Analyzer");
         dialog.setModal(true);
         dialog.setModalityType(ModalityType.DOCUMENT_MODAL);
-        dialog.setBounds(200, 200, 400, 300);
+        dialog.setBounds(200, 200, 800, 600);
 //        dialog.pack();        
         dialog.setVisible(true);        
     }     

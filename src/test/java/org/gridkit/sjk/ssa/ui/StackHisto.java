@@ -1,4 +1,4 @@
-package org.gridkit.sjk.ssa;
+package org.gridkit.sjk.ssa.ui;
 
 import java.util.ArrayList;
 import java.util.Collection;

@@ -1,31 +1,22 @@
-package org.gridkit.sjk.ssa;
+package org.gridkit.sjk.ssa.ui;
 
 import java.io.Reader;
 import java.io.Writer;
-import java.lang.management.ManagementFactory;
-import java.lang.management.ThreadMXBean;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 
-import org.gridkit.jvmtool.StackFilterParser.LastNode;
-import org.gridkit.sjk.ssa.ClassifierModel.ConjunctionNode;
-import org.gridkit.sjk.ssa.ClassifierModel.DisjunctionNode;
-import org.gridkit.sjk.ssa.ClassifierModel.Subclass;
+import org.gridkit.jvmtool.StackTraceFilter;
 
 @SuppressWarnings("serial")
 public class ClassifierModel extends DefaultTreeModel {
 
-    private RootNode root;
-    
     public ClassifierModel() {
         super(new RootNode());
-        this.root = getRoot();
     }
 
     @Override
@@ -33,18 +24,104 @@ public class ClassifierModel extends DefaultTreeModel {
         return (RootNode)super.getRoot();
     }
 
-
-    public void reset() {
-        RootNode node = new RootNode();
-        setRoot(node);
-    }        
-    
     public void load(Reader source) {
-        
+        RootNode node = new RootNode();
+        new ClassificationCodec(node).parse(source);
+        setRoot(node);
     }
 
     public void store(Writer target) {
         
+    }
+
+    public List<FilterRef> getFilters() {
+        List<FilterRef> filters = new ArrayList<FilterRef>();
+        List<Classification> cl = getRoot().getChildren();
+        for(Classification c: cl) {
+            String cn = c.getName();
+            filters.add(new FilterRef(cn));
+            List<CommonNode> sl = c.getChildren();
+            for(CommonNode s: sl) {
+                if (s instanceof Subclass) {
+                        String sn = ((Subclass) s).getName();
+                        filters.add(new FilterRef(cn, sn));
+                }
+            }
+        }
+        return filters;
+    }
+    
+    public StackTraceFilter getFilter(FilterRef ref) {
+        throw new UnsupportedOperationException();
+    }
+    
+    public static class FilterRef implements Comparable<FilterRef> {
+        
+        private String classificationName;
+        private String subclassName;
+        
+        public FilterRef(String classificationName) {
+            this.classificationName = classificationName;
+        }
+
+        public FilterRef(String classificationName, String subclassName) {
+            this.classificationName = classificationName;
+            this.subclassName = subclassName;
+        }
+
+        public String getClassificationName() {
+            return classificationName;
+        }
+
+        public String getSubclassName() {
+            return subclassName;
+        }
+        
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + ((classificationName == null) ? 0 : classificationName.hashCode());
+            result = prime * result + ((subclassName == null) ? 0 : subclassName.hashCode());
+            return result;
+        }
+
+        public boolean isSubclass() {
+            return subclassName != null;
+        }
+        
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            if (getClass() != obj.getClass())
+                return false;
+            FilterRef other = (FilterRef) obj;
+            if (classificationName == null) {
+                if (other.classificationName != null)
+                    return false;
+            } else if (!classificationName.equals(other.classificationName))
+                return false;
+            if (subclassName == null) {
+                if (other.subclassName != null)
+                    return false;
+            } else if (!subclassName.equals(other.subclassName))
+                return false;
+            return true;
+        }
+
+        @Override
+        public int compareTo(FilterRef o) {
+            int n = classificationName.compareTo(o.classificationName);
+            if (n != 0) {
+                return n;
+            }
+            String s1 = subclassName == null ? "" : subclassName;
+            String s2 = o.subclassName == null ? "" : o.subclassName;
+            return s1.compareTo(s2);
+        }
     }
     
     public static class RootNode extends CommonNode {
@@ -81,6 +158,10 @@ public class ClassifierModel extends DefaultTreeModel {
             add(rootFilter);
         }
         
+        public String getName() {
+            return name;
+        }
+
         public RootFilter getRootFilter() {
             return rootFilter;
         }
@@ -117,6 +198,10 @@ public class ClassifierModel extends DefaultTreeModel {
         
         public Subclass(String name) {
             this.name = name;
+        }
+
+        public String getName() {
+            return name;
         }
 
         @Override
@@ -250,6 +335,15 @@ public class ClassifierModel extends DefaultTreeModel {
         
         public String getComment() {
             return comment;
+        }
+        
+        @SuppressWarnings("unchecked")
+        public <T> List<T> getChildren() {
+            List<T> list = new ArrayList<T>();
+            for(int i = 0; i != getChildCount(); ++i) {
+                list.add((T) getChildAt(i));
+            }
+            return list;
         }
         
         public abstract String getHtmlCaption();

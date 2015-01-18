@@ -1,16 +1,16 @@
-package org.gridkit.sjk.ssa;
+package org.gridkit.sjk.ssa.ui;
 
 import java.io.Reader;
 
 import org.gridkit.jvmtool.Cascade;
 import org.gridkit.jvmtool.StackFilterParser;
-import org.gridkit.sjk.ssa.ClassifierModel.Classification;
-import org.gridkit.sjk.ssa.ClassifierModel.CompositePredicateNode;
-import org.gridkit.sjk.ssa.ClassifierModel.ConjunctionNode;
-import org.gridkit.sjk.ssa.ClassifierModel.DisjunctionNode;
-import org.gridkit.sjk.ssa.ClassifierModel.LastQuantor;
-import org.gridkit.sjk.ssa.ClassifierModel.RootNode;
-import org.gridkit.sjk.ssa.ClassifierModel.Subclass;
+import org.gridkit.sjk.ssa.ui.ClassifierModel.Classification;
+import org.gridkit.sjk.ssa.ui.ClassifierModel.CompositePredicateNode;
+import org.gridkit.sjk.ssa.ui.ClassifierModel.ConjunctionNode;
+import org.gridkit.sjk.ssa.ui.ClassifierModel.DisjunctionNode;
+import org.gridkit.sjk.ssa.ui.ClassifierModel.LastQuantor;
+import org.gridkit.sjk.ssa.ui.ClassifierModel.RootNode;
+import org.gridkit.sjk.ssa.ui.ClassifierModel.Subclass;
 
 class ClassificationCodec {
 

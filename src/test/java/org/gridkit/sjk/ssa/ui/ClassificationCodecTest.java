@@ -1,9 +1,9 @@
-package org.gridkit.sjk.ssa;
+package org.gridkit.sjk.ssa.ui;
 
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 
-import org.gridkit.sjk.ssa.ClassifierModel.RootNode;
+import org.gridkit.sjk.ssa.ui.ClassifierModel.RootNode;
 import org.junit.Test;
 
 public class ClassificationCodecTest {

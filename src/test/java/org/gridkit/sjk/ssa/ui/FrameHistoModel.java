@@ -1,11 +1,11 @@
-package org.gridkit.sjk.ssa;
+package org.gridkit.sjk.ssa.ui;
 
 import java.util.Arrays;
 import java.util.Collection;
 
 import javax.swing.table.DefaultTableModel;
 
-import org.gridkit.sjk.ssa.StackHisto.SiteInfo;
+import org.gridkit.sjk.ssa.ui.StackHisto.SiteInfo;
 
 @SuppressWarnings("serial")
 public class FrameHistoModel extends DefaultTableModel {

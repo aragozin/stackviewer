@@ -19,7 +19,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-package org.gridkit.sjk.ssa;
+package org.gridkit.sjk.ssa.ui;
 
 import java.awt.Color;
 import java.awt.Cursor;
@@ -35,8 +35,8 @@ import javax.accessibility.AccessibleRole;
 import javax.swing.JPanel;
 import javax.swing.event.MouseInputAdapter;
 
-import org.gridkit.sjk.ssa.MultiSplitLayout.Divider;
-import org.gridkit.sjk.ssa.MultiSplitLayout.Node;
+import org.gridkit.sjk.ssa.ui.MultiSplitLayout.Divider;
+import org.gridkit.sjk.ssa.ui.MultiSplitLayout.Node;
 
 /**
  *

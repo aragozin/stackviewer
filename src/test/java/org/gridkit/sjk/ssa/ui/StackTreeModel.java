@@ -1,28 +1,63 @@
-package org.gridkit.sjk.ssa;
+package org.gridkit.sjk.ssa.ui;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Vector;
 
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreeNode;
+import javax.swing.tree.TreePath;
 
 @SuppressWarnings("serial")
 public class StackTreeModel extends DefaultTreeModel {
 
-    static final Comparator<Node> FREQ_COMPARATOR = new FrequencyComparator();
+    static final Comparator<FrameNode> FREQ_COMPARATOR = new FrequencyComparator();
+    
+    private StackTree tree;
     
     public StackTreeModel() {
         super(new Empty());
     }
 
+    public StackTree getStackTree() {
+        return tree;
+    }
+    
     public void setTree(StackTree tree) {
+        this.tree = tree;
         if (tree == null) {
             setRoot(new Empty());
         }
         else {
-            setRoot(new Node(tree, new StackTraceElement[0]));
+            setRoot(new FrameNode(tree, new StackTraceElement[0]));
+        }
+    }
+    
+    public TreePath toTreePath(StackTraceElement[] path) {
+        Object root =  getRoot();
+        if (root instanceof FrameNode) {
+            List<FrameNode> treePath = new ArrayList<FrameNode>();
+            FrameNode node = (FrameNode) root;
+            treePath.add(node);
+            pathLoop:
+            for(int i = 0; i != path.length; ++i) {
+                for(FrameNode child: node.childList()) {
+                    if (child.getFrame().equals(path[i])) {
+                        treePath.add(child);
+                        node = child;
+                        continue pathLoop;
+                    }
+                }
+                // path element is not found
+                return null;
+            }
+            return new TreePath(treePath.toArray());
+        }
+        else {
+            return null;
         }
     }
     
@@ -69,12 +104,12 @@ public class StackTreeModel extends DefaultTreeModel {
         }
     }
     
-    public static class Node implements TreeNode, FrameInfo {
+    public static class FrameNode implements TreeNode, FrameInfo {
 
         StackTree tree;
         StackTraceElement[] path;
         
-        public Node(StackTree tree, StackTraceElement[] path) {
+        public FrameNode(StackTree tree, StackTraceElement[] path) {
             this.tree = tree;
             this.path = path;
                     
@@ -128,7 +163,7 @@ public class StackTreeModel extends DefaultTreeModel {
 
         @Override
         public TreeNode getParent() {
-            return path.length == 0 ? null : new Node(tree, Arrays.copyOf(path, path.length - 1));
+            return path.length == 0 ? null : new FrameNode(tree, Arrays.copyOf(path, path.length - 1));
         }
 
         @Override
@@ -146,11 +181,11 @@ public class StackTreeModel extends DefaultTreeModel {
             return getChildCount() == 0;
         }
 
-        private Node[] childList() {
+        public FrameNode[] childList() {
             StackTraceElement[] d = tree.getDescendants(path);
-            Node[] list = new Node[d.length];
+            FrameNode[] list = new FrameNode[d.length];
             for(int i = 0; i != list.length; ++i) {
-                list[i] = new Node(tree, child(path, d[i]));
+                list[i] = new FrameNode(tree, child(path, d[i]));
             }
             Arrays.sort(list, FREQ_COMPARATOR);
             return list;
@@ -159,7 +194,7 @@ public class StackTreeModel extends DefaultTreeModel {
         @Override
         @SuppressWarnings("rawtypes")
         public Enumeration children() {
-            return new Vector<Node>(Arrays.asList(childList())).elements();
+            return new Vector<FrameNode>(Arrays.asList(childList())).elements();
         }
 
         @Override
@@ -179,7 +214,7 @@ public class StackTreeModel extends DefaultTreeModel {
                 return false;
             if (getClass() != obj.getClass())
                 return false;
-            Node other = (Node) obj;
+            FrameNode other = (FrameNode) obj;
             if (!Arrays.equals(path, other.path))
                 return false;
             if (tree == null) {
@@ -209,9 +244,9 @@ public class StackTreeModel extends DefaultTreeModel {
         
     }
     
-    private static class FrequencyComparator implements Comparator<Node> {
+    private static class FrequencyComparator implements Comparator<FrameNode> {
         @Override
-        public int compare(Node o1, Node o2) {
+        public int compare(FrameNode o1, FrameNode o2) {
             return Long.signum(o2.getHitCount() - o1.getHitCount());
         }
     }
