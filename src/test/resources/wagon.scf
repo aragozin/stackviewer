@@ -1,0 +1,10 @@
+[IO]
++Socket IO
+    **.ServerSocketChannelImpl.select
+    **.SelectorImpl.selectNow
+    **.SocketChannelImpl.read
+    **.SocketChannelImpl.write
+    **.ServerSocketChannelImpl.accept
+
+[Reactor]
+    **.SelectorReactor

@@ -1,6 +1,6 @@
 package org.gridkit.sjk.ssa.ui;
 
-public interface StackTraceClassificator {
+public interface StackTraceClassifier {
 
     public String classify(StackTraceElement[] trace);
     

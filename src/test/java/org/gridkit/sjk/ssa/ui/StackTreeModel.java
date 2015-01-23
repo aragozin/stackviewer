@@ -17,6 +17,8 @@ public class StackTreeModel extends DefaultTreeModel {
     static final Comparator<FrameNode> FREQ_COMPARATOR = new FrequencyComparator();
     
     private StackTree tree;
+    private String filterClassification;
+    private String filterBucket;
     
     public StackTreeModel() {
         super(new Empty());
@@ -32,8 +34,18 @@ public class StackTreeModel extends DefaultTreeModel {
             setRoot(new Empty());
         }
         else {
-            setRoot(new FrameNode(tree, new StackTraceElement[0]));
+            setRoot(new FrameNode(tree, new StackTraceElement[0], filterClassification, filterBucket));
         }
+    }
+    
+    public void setBucketFilter(String filterClassification, String filterBucket) {
+        this.filterClassification = filterClassification;
+        this.filterBucket = filterBucket;
+        updateRoot(filterClassification, filterBucket);
+    }
+
+    protected void updateRoot(String filterClassification, String filterBucket) {
+        setRoot(new FrameNode(tree, new StackTraceElement[0], filterClassification, filterBucket));
     }
     
     public TreePath toTreePath(StackTraceElement[] path) {
@@ -108,11 +120,23 @@ public class StackTreeModel extends DefaultTreeModel {
 
         StackTree tree;
         StackTraceElement[] path;
+        String classification;
+        String bucket;
         
-        public FrameNode(StackTree tree, StackTraceElement[] path) {
+        public FrameNode(StackTree tree, StackTraceElement[] path, String classification, String bucket) {
             this.tree = tree;
             this.path = path;
-                    
+            this.classification = classification;
+            this.bucket = bucket;                    
+        }
+        
+        private int getHitCount(StackTraceElement[] path) {
+            if (classification == null) {
+                return tree.getTotalCount(path);
+            }
+            else {
+                return tree.getBucketCount(classification, bucket, path);
+            }
         }
         
         @Override
@@ -127,17 +151,32 @@ public class StackTreeModel extends DefaultTreeModel {
         
         @Override
         public int getTreeHitCount() {
-            return tree.getTotalCount(new StackTraceElement[0]);
+            return getHitCount(new StackTraceElement[0]);
         }
 
         @Override
         public int getHitCount() {
-            return tree.getTotalCount(path);
+            return getHitCount(path);
         }
 
         @Override
         public int getParentHitCount() {
-            return path.length == 0 ? 0 : tree.getTotalCount(parent(path));
+            return path.length == 0 ? 0 : getHitCount(parent(path));
+        }
+
+        @Override
+        public int getBucketCount(String classification, String bucket) {
+            return tree.getBucketCount(classification, bucket, path);
+        }
+
+        @Override
+        public int getTreeBucketCount(String classification, String bucket) {
+            return tree.getBucketCount(classification, bucket, new StackTraceElement[0]);
+        }
+        
+        @Override
+        public int getParentBucketCount(String classification, String bucket) {
+            return path.length == 0 ? 0 : tree.getBucketCount(classification, bucket, parent(path));
         }
 
         @Override
@@ -158,12 +197,12 @@ public class StackTreeModel extends DefaultTreeModel {
 
         @Override
         public int getChildCount() {
-            return tree.getDescendants(path).length;
+            return childList().length;
         }
 
         @Override
         public TreeNode getParent() {
-            return path.length == 0 ? null : new FrameNode(tree, Arrays.copyOf(path, path.length - 1));
+            return path.length == 0 ? null : new FrameNode(tree, Arrays.copyOf(path, path.length - 1), classification, bucket);
         }
 
         @Override
@@ -185,9 +224,24 @@ public class StackTreeModel extends DefaultTreeModel {
             StackTraceElement[] d = tree.getDescendants(path);
             FrameNode[] list = new FrameNode[d.length];
             for(int i = 0; i != list.length; ++i) {
-                list[i] = new FrameNode(tree, child(path, d[i]));
+                list[i] = new FrameNode(tree, child(path, d[i]), classification, bucket);
             }
             Arrays.sort(list, FREQ_COMPARATOR);
+            int n = list.length;
+            while(n > 0) {
+                int hc = list[n - 1].getHitCount();
+                if (hc > 0) {
+                    break;
+                }
+                else {
+                    --n;
+                }
+            }
+            
+            if (n != list.length) {
+                list = Arrays.copyOf(list, n);
+            }
+            
             return list;
         }
         
@@ -241,6 +295,12 @@ public class StackTreeModel extends DefaultTreeModel {
         int getHitCount();
         
         int getParentHitCount();
+        
+        int getBucketCount(String classification, String bucket);
+
+        int getTreeBucketCount(String classification, String bucket);
+
+        int getParentBucketCount(String classification, String bucket);
         
     }
     

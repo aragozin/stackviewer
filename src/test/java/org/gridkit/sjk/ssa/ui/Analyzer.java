@@ -27,8 +27,9 @@ public class Analyzer {
             public StackTraceReader getReader() {
                 try {
 //                    return StackTraceCodec.newReader(new FileInputStream("C:/WarZone/spaces/blog/blog-docs/_tmp/case1.stp"));
-                    return StackTraceCodec.newReader(new FileInputStream("case1.stp"));
+//                    return StackTraceCodec.newReader(new FileInputStream("case1.stp"));
 //                    return StackTraceCodec.newReader(new FileInputStream("C:/WarZone/docs/_tmp/case1.stp"));
+                    return StackTraceCodec.newReader(new FileInputStream("C:/WarZone/docs/_tmp/threads-100u-1-1408727085233.stp"));
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -37,13 +38,14 @@ public class Analyzer {
     }
     
     @Test
-    public void start() throws ClassNotFoundException, InstantiationException, IllegalAccessException, UnsupportedLookAndFeelException, FileNotFoundException {
+    public void start() throws ClassNotFoundException, InstantiationException, IllegalAccessException, UnsupportedLookAndFeelException, IOException {
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 //        UIManager.setLookAndFeel("com.sun.java.swing.plaf.windows.WindowsClassicLookAndFeel");
 //        UIManager.setLookAndFeel("com.sun.java.swing.plaf.nimbus.NimbusLookAndFeel");
 
         AnalyzerPane pane = new AnalyzerPane();
         pane.setTraceDump(source);
+//        pane.loadClassification(new FileReader("src/test/resources/wagon.scf"));
         pane.loadClassification(new FileReader("src/test/resources/jboss-seam.scf"));
 
         JDialog dialog = new JDialog();

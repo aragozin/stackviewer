@@ -43,8 +43,12 @@ public class StackTree {
         };
     }
     
-    public void addClassification() {
-        
+    public void addClassification(String name, StackTraceClassifier classificator) {
+        classify(root, name, classificator);        
+    }
+    
+    public void removeClassification(String name) {
+        unclassify(root, name);
     }
     
     public int getTotalCount(StackTraceElement[] path) {
@@ -62,7 +66,7 @@ public class StackTree {
         return node == null ? 0 : node.getHisto(classification).get(bucket);                
     }
 
-    public int[] getBucketCount(String classification, String[] buckets, StackTraceElement[] path) {
+    public int[] getBucketsCount(String classification, String[] buckets, StackTraceElement[] path) {
         Node node = lookup(path);
         int[] result = new int[buckets.length];
         if (node != null) {
@@ -103,6 +107,33 @@ public class StackTree {
         }
     }
 
+    private void classify(Node node, String name, StackTraceClassifier classificator) {
+
+        node.addHisto(name);
+        Subhistogram subhisto = node.getHisto(name);
+        
+        for(Node c: node.children.values()) {
+            classify(c, name, classificator);
+            subhisto.addAll(c.getHisto(name));
+        }
+        
+        if (node.terminalCount != 0) {
+            String cat = classificator.classify(node.path);
+            if (cat != null) {
+                subhisto.adjust(cat, node.terminalCount);
+            }
+        }
+    }
+
+    private void unclassify(Node node, String name) {
+        
+        node.removeHisto(name);
+        
+        for(Node c: node.children.values()) {
+            unclassify(c, name);
+        }
+    }
+    
     private static class Node {
         
         StackTraceElement[] path;
@@ -154,12 +185,27 @@ public class StackTree {
         private int[] traceCounts = new int[0];
         
         public int get(String bucket) {
-            for(int i = 0; i != buckets.length; ++i) {
-                if (bucket.equals(buckets[i])) {
-                    return traceCounts[i];
+            if (bucket == null) {
+                int total = 0;
+                for(int i = 0; i != buckets.length; ++i) {
+                    total += traceCounts[i];
                 }
+                return total;
             }
-            return 0;
+            else {
+                for(int i = 0; i != buckets.length; ++i) {
+                    if (bucket.equals(buckets[i])) {
+                        return traceCounts[i];
+                    }
+                }
+                return 0;
+            }
+        }
+
+        public void addAll(Subhistogram histo) {
+            for(String bucket: histo.buckets) {
+                adjust(bucket, histo.get(bucket));
+            }            
         }
 
         public void adjust(String bucket, int delta) {

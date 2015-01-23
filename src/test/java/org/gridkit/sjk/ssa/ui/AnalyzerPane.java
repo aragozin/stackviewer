@@ -12,18 +12,25 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -34,12 +41,14 @@ import javax.swing.SwingUtilities;
 import javax.swing.ToolTipManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.event.ListDataEvent;
+import javax.swing.event.ListDataListener;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 
 import org.gridkit.jvmtool.StackTraceReader;
-import org.gridkit.sjk.ssa.ui.ClassifierModel.CommonNode;
-import org.gridkit.sjk.ssa.ui.ClassifierModel.FilterRef;
+import org.gridkit.sjk.ssa.ui.ClassificationEditor.FilterRef;
+import org.gridkit.sjk.ssa.ui.ClassificationTreeModel.CommonNode;
 import org.gridkit.sjk.ssa.ui.MultiSplitLayout.Divider;
 import org.gridkit.sjk.ssa.ui.MultiSplitLayout.Leaf;
 import org.gridkit.sjk.ssa.ui.MultiSplitLayout.Node;
@@ -69,12 +78,15 @@ public class AnalyzerPane extends JPanel {
         }
     };
     
+
+    private ClassificationEditor classificationEditor = new ClassificationEditor(); 
+
     private StackTraceSource source;
     private StackTree tree;
     private StackHisto histo;
-    private File classificationFile;
+    private ClassificationModel classificationModel = classificationEditor;
     
-    private ClassificationPane classificationPane = new ClassificationPane();
+    private JComponent classificationPane = classificationEditor.getEditorComponent();
     private BarPane barPane = new BarPane();
     private ExplorerPane explorerPane = new ExplorerPane();
     
@@ -113,9 +125,8 @@ public class AnalyzerPane extends JPanel {
         }
     }
     
-    public void loadClassification(Reader reader) {
-        classificationPane.model.load(reader);
-        updateClassification();
+    public void loadClassification(Reader reader) throws IOException {
+        classificationEditor.loadFromReader(reader);
     }
 
     private void rebuildTree() throws IOException {
@@ -149,31 +160,8 @@ public class AnalyzerPane extends JPanel {
         explorerPane.frameHisto.table.packAll();
     }
     
-    public void setClassificationFile(File file) {
-        this.classificationFile = file;
-    }
-
-    private void updateClassification() {
-        ModelUtils.updateComboBoxModel(explorerPane.categoryCombo.getModel(), classificationPane.model.getFilters());
-        AutoCompleteDecorator.decorate(explorerPane.categoryCombo, newFilterRefToString());
-
-    }
-    
-    private class ClassificationPane extends JPanel {
-        
-        JTree tree = new JTree();
-        ClassifierModel model = new ClassifierModel();
-        
-        public ClassificationPane() {
-            tree.setModel(model);
-            tree.setRootVisible(false);
-            tree.setShowsRootHandles(true);
-            tree.setCellRenderer(new ClassificationNodeRenderer());
-            
-            setLayout(new BorderLayout());           
-            add(new JScrollPane(tree), BorderLayout.CENTER);
-            setBorder(BorderFactory.createTitledBorder("Classification"));
-        }        
+    public void setClassificationFile(File file) throws IOException {
+        classificationEditor.loadFromFile(file);
     }
 
     private class BarPane extends JPanel {
@@ -193,6 +181,9 @@ public class AnalyzerPane extends JPanel {
         JComboBox categoryCombo = new JComboBox();
         JToggleButton treeButton = new JToggleButton("Tree");
         JToggleButton histoButton = new JToggleButton("Histo");
+        
+        FilterRef appliedFilter = new FilterRef(null);
+        List<String> appliedClassifications = new ArrayList<String>();
         
         public ExplorerPane() {
             setLayout(new BorderLayout());
@@ -217,6 +208,72 @@ public class AnalyzerPane extends JPanel {
             cards.add(frameHisto, "histo");
             showCard("tree");
 
+            setupTreeHistoSwitch();      
+            installClassificationListener();
+            installFilterListener();
+        }
+
+        private void installFilterListener() {
+            categoryCombo.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    System.out.println("Filter: " + categoryCombo.getSelectedItem());
+                    updateFilter();
+                    SwingUtilities.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (categoryCombo.getSelectedItem() == null) {
+                                categoryCombo.setSelectedIndex(0);
+                            }                            
+                        }
+                    });
+                }
+            });
+//            categoryCombo.addFocusListener(new FocusListener() {
+//                
+//                @Override
+//                public void focusLost(FocusEvent e) {
+//                    updateFilter();                    
+//                }
+//                
+//                @Override
+//                public void focusGained(FocusEvent e) {
+//                    // do nothing
+//                }
+//            });            
+        }
+
+        protected void updateFilter() {
+            FilterRef filter = (FilterRef) categoryCombo.getSelectedItem();
+            if (filter != null) {
+                if (!filter.equals(appliedFilter)) {
+                    applyRootFilter(filter);
+                }            
+            }
+        }
+        
+        private void applyRootFilter(FilterRef filter) {
+            if (filter.getClassificationName() != null) {
+                if (!appliedClassifications.contains(filter.getClassificationName())) {
+                    StackTraceClassifier classifier = classificationModel.getClassifier(filter.classification());
+                    tree.addClassification(filter.getClassificationName(), classifier);
+                    appliedClassifications.add(filter.getClassificationName());
+                }
+            }
+            System.out.println("Update tree filter: " + filter);
+            stackTree.treeModel.setBucketFilter(filter.getClassificationName(), filter.getSubclassName());
+            appliedFilter = filter;
+        }
+
+        protected void cleanCategorization() {
+            for(String cat: appliedClassifications) {
+                tree.removeClassification(cat);
+            }
+            appliedClassifications.clear();
+            applyRootFilter(new FilterRef(null));
+        }
+        
+        protected void setupTreeHistoSwitch() {
             treeButton.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -238,9 +295,27 @@ public class AnalyzerPane extends JPanel {
                         showCard("tree");                        
                     }
                 }
-            });            
+            });
         }
 
+        private void installClassificationListener() {
+            classificationModel.addClassificationListener(new PropertyChangeListener() {
+                
+                @Override
+                public void propertyChange(PropertyChangeEvent evt) {
+                    onClassificationUpdated();
+                }
+            });
+        }
+
+        protected void onClassificationUpdated() {
+            cleanCategorization();
+            List<FilterRef> model = new ArrayList<ClassificationEditor.FilterRef>(classificationModel.getAvailableFilters());
+            model.add(0, new FilterRef(null));
+            ModelUtils.updateComboBoxModel(categoryCombo.getModel(), model);
+            AutoCompleteDecorator.decorate(categoryCombo, newFilterRefToString());
+        }        
+        
         private void showCard(String card) {
             CardLayout l = (CardLayout) cards.getLayout();
             l.show(cards, card);
@@ -491,22 +566,6 @@ public class AnalyzerPane extends JPanel {
         }
     }
     
-    private class ClassificationNodeRenderer extends DefaultTreeCellRenderer {
-        
-        @Override
-        public Component getTreeCellRendererComponent(JTree tree, Object value, boolean selected, boolean expanded, boolean leaf, int row, boolean hasFocus) {
-            super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus);
-            setIcon(null);
-            
-            if (value instanceof ClassifierModel.CommonNode) {
-                CommonNode node = (CommonNode) value;
-                setText(node.getHtmlCaption());
-            }
-            
-            return this;
-        }
-    }
-    
     private class StackFrameTreeNodeRenderer extends DefaultTreeCellRenderer {
         
         DecimalFormat pctFormat = new DecimalFormat("##.#%");
@@ -589,13 +648,19 @@ public class AnalyzerPane extends JPanel {
             
             @Override
             public String getPreferredStringForItem(Object item) {
-                if (item instanceof FilterRef) {
-                    FilterRef r = (FilterRef) item;
+                if (item instanceof ClassificationEditor.FilterRef) {
+                    ClassificationEditor.FilterRef r = (ClassificationEditor.FilterRef) item;
                     if (r.isSubclass()) {
                         return r.getSubclassName();
                     }
                     else {
-                        return r.getClassificationName();
+                        String name = r.getClassificationName();
+                        if (name == null) {
+                            return "";
+                        }
+                        else {
+                            return name;
+                        }
                     }
                 }
                 return String.valueOf(item);
