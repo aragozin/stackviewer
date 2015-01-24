@@ -26,10 +26,8 @@ public class Analyzer {
             @Override
             public StackTraceReader getReader() {
                 try {
-//                    return StackTraceCodec.newReader(new FileInputStream("C:/WarZone/spaces/blog/blog-docs/_tmp/case1.stp"));
-//                    return StackTraceCodec.newReader(new FileInputStream("case1.stp"));
-//                    return StackTraceCodec.newReader(new FileInputStream("C:/WarZone/docs/_tmp/case1.stp"));
-                    return StackTraceCodec.newReader(new FileInputStream("C:/WarZone/docs/_tmp/threads-100u-1-1408727085233.stp"));
+                    return StackTraceCodec.newReader(new FileInputStream("case1.stp"));
+//                    return StackTraceCodec.newReader(new FileInputStream("C:/WarZone/docs/_tmp/threads-100u-1-1408727085233.stp"));
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }

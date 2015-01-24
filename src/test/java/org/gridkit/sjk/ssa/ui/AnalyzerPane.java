@@ -10,10 +10,16 @@ import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
+import java.awt.datatransfer.Transferable;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.File;
@@ -26,13 +32,18 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import javax.swing.AbstractAction;
+import javax.swing.Action;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
+import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JToggleButton;
@@ -92,16 +103,20 @@ public class AnalyzerPane extends JPanel {
     
     public AnalyzerPane() {
         
+        Leaf nclassification = new Leaf("classification");
+        Leaf nbar = new Leaf("bar");
+        Leaf nsamples = new Leaf("samples");
         Node[] layout = {
-            new Leaf("classification"),
+            nclassification,
+//            new Divider(), 
+//            nbar,
             new Divider(), 
-            new Leaf("bar"),
-            new Divider(), 
-            new Leaf("samples"),
+            nsamples,
         };
-        layout[0].setWeight(0.4);
-        layout[2].setWeight(0.2);
-        layout[4].setWeight(0.4);
+        nclassification.setWeight(0.4);
+        nbar.setWeight(0.2);
+        nsamples.setWeight(0.4);
+
         Split split = new Split();
         split.setChildren(asList(layout));
         
@@ -336,6 +351,10 @@ public class AnalyzerPane extends JPanel {
         private StackTreeModel treeModel = new StackTreeModel();
         private StackTreeToolbar toolbar = new StackTreeToolbar(this);
         
+        private JPopupMenu contextMenu = new JPopupMenu();
+        private StackTreeModel.FrameInfo rightClickNode;
+        private List<ContextAction> contextActions = new ArrayList<ContextAction>();
+        
         public StackTreePane() {            
             tree.setRootVisible(false);
             tree.setShowsRootHandles(true);
@@ -346,6 +365,8 @@ public class AnalyzerPane extends JPanel {
             setLayout(new BorderLayout());
             add(new JScrollPane(tree), BorderLayout.CENTER);
             add(toolbar, BorderLayout.NORTH);
+            
+            installContextMenu();
         }
         
         public void expand(StackTraceElement[] path) {
@@ -373,6 +394,84 @@ public class AnalyzerPane extends JPanel {
                 doExpand(path.getParentPath());
             }
             tree.expandPath(path);
+        }
+        
+        private void installContextMenu() {
+            contextMenu.add(createCopyFrameAction());
+            contextMenu.add(createCopyPathAction());
+            tree.addMouseListener(new ContextMenuListener());
+        }
+        
+        private Action createCopyFrameAction() {
+            ContextAction action = new ContextAction("Copy frame") {
+
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    StackTraceElement frame = rightClickNode.getFrame();
+                    pushToClipboard(frame.toString());
+                }
+
+                @Override
+                public void beforeShow() {
+                    setEnabled(rightClickNode != null);
+                }
+            };
+            contextActions.add(action);
+            return action;
+        }
+
+        private Action createCopyPathAction() {
+            ContextAction action = new ContextAction("Copy path") {
+
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    StackTraceElement[] path = rightClickNode.getPath();
+                    StringBuilder sb = new StringBuilder();
+                    for(StackTraceElement f: path) {
+                        if (sb.length() > 0) {
+                            sb.append('\n');
+                        }
+                        sb.append(f.toString());
+                    }
+                    pushToClipboard(sb.toString());
+                }
+
+                @Override
+                public void beforeShow() {
+                    setEnabled(rightClickNode != null);
+                }
+            };
+            contextActions.add(action);
+            return action;
+        }
+
+        private final class ContextMenuListener extends MouseAdapter {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                onMouseEvent(e);
+            }
+        
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                onMouseEvent(e);
+            }
+        
+            private void onMouseEvent(MouseEvent e) {
+                if (e.isPopupTrigger()) {
+                    int row = tree.getRowForLocation(e.getX(), e.getY());
+                    if (row != -1) {
+                        TreePath path = tree.getPathForRow(row);
+                        rightClickNode = (FrameInfo) path.getLastPathComponent();
+                    }
+                    else {
+                        rightClickNode = null;
+                    }
+                    for(ContextAction ca: contextActions) {
+                        ca.beforeShow();
+                    }
+                    contextMenu.show(e.getComponent(), e.getX(), e.getY());
+                }                    
+            }
         }
     }    
     
@@ -627,6 +726,23 @@ public class AnalyzerPane extends JPanel {
         }
     }
     
+    private abstract class ContextAction extends AbstractAction { 
+        
+        public ContextAction() {
+            super();
+        }
+
+        public ContextAction(String name, Icon icon) {
+            super(name, icon);
+        }
+
+        public ContextAction(String name) {
+            super(name);
+        }
+
+        public abstract void beforeShow();         
+    }
+    
     static String shortName(String className) {
         int n = className.lastIndexOf('.');
         if (n >= 0) {
@@ -666,6 +782,10 @@ public class AnalyzerPane extends JPanel {
                 return String.valueOf(item);
             }
         };
+    }
+    
+    static void pushToClipboard(String text) {
+        Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
     }
     
     private static class NaturalComparator implements Comparator<Comparable<Object>> {
