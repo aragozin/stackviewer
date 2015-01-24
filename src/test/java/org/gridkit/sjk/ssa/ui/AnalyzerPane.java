@@ -11,13 +11,9 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Toolkit;
-import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
-import java.awt.datatransfer.Transferable;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.FocusEvent;
-import java.awt.event.FocusListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.beans.PropertyChangeEvent;
@@ -41,7 +37,6 @@ import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
-import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
@@ -52,14 +47,11 @@ import javax.swing.SwingUtilities;
 import javax.swing.ToolTipManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.event.ListDataEvent;
-import javax.swing.event.ListDataListener;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 
 import org.gridkit.jvmtool.StackTraceReader;
 import org.gridkit.sjk.ssa.ui.ClassificationEditor.FilterRef;
-import org.gridkit.sjk.ssa.ui.ClassificationTreeModel.CommonNode;
 import org.gridkit.sjk.ssa.ui.MultiSplitLayout.Divider;
 import org.gridkit.sjk.ssa.ui.MultiSplitLayout.Leaf;
 import org.gridkit.sjk.ssa.ui.MultiSplitLayout.Node;
@@ -94,7 +86,7 @@ public class AnalyzerPane extends JPanel {
 
     private StackTraceSource source;
     private StackTree tree;
-    private StackHisto histo;
+    private StackFrameHisto histo;
     private ClassificationModel classificationModel = classificationEditor;
     
     private JComponent classificationPane = classificationEditor.getEditorComponent();
@@ -160,7 +152,7 @@ public class AnalyzerPane extends JPanel {
     }
 
     private void rebuildHisto() throws IOException {
-        histo = new StackHisto();
+        histo = new StackFrameHisto();
         StackTraceReader reader = source.getReader();
         if (!reader.isLoaded()) {
             reader.loadNext();
@@ -229,6 +221,9 @@ public class AnalyzerPane extends JPanel {
         }
 
         private void installFilterListener() {
+            // temporary hack
+            stackTree.toolbar.explorerPanel = this;
+            
             categoryCombo.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -244,18 +239,6 @@ public class AnalyzerPane extends JPanel {
                     });
                 }
             });
-//            categoryCombo.addFocusListener(new FocusListener() {
-//                
-//                @Override
-//                public void focusLost(FocusEvent e) {
-//                    updateFilter();                    
-//                }
-//                
-//                @Override
-//                public void focusGained(FocusEvent e) {
-//                    // do nothing
-//                }
-//            });            
         }
 
         protected void updateFilter() {
@@ -477,7 +460,8 @@ public class AnalyzerPane extends JPanel {
     
     private class StackTreeToolbar extends JPanel {
         
-        StackTreePane pane;
+        ExplorerPane explorerPanel;
+        StackTreePane treePane;
         
         JButton collapse = new JButton("[-]");
         JButton expand = new JButton("[+]");
@@ -486,7 +470,7 @@ public class AnalyzerPane extends JPanel {
         JButton filters = new JButton("[f]");
         
         public StackTreeToolbar(StackTreePane pane) {
-            this.pane = pane;
+            this.treePane = pane;
             
             collapse.addActionListener(newCollapseAllAction());
             expand.addActionListener(newExpandAllAction());
@@ -533,29 +517,33 @@ public class AnalyzerPane extends JPanel {
         }
         
         void expandAll() {
-            StackTree stree = pane.treeModel.getStackTree();
-            for(StackTraceElement[] path: stree.enumDeepPaths()) {
-                pane.expand(path);
+            StackTree stree = treePane.treeModel.getStackTree();
+            String classification = explorerPane.appliedFilter.getClassificationName();
+            String bucket = explorerPane.appliedFilter.getSubclassName();
+            for(StackTraceElement[] path: stree.enumDeepPaths(classification, bucket)) {
+                treePane.expand(path);
             }            
         }
 
         void collapseAll() {
-            pane.collapseAll();
+            treePane.collapseAll();
         }
 
         void expandSameFrame() {            
-            TreePath selection = pane.tree.getSelectionPath();
+            TreePath selection = treePane.tree.getSelectionPath();
             if (selection != null) {
                 FrameNode node = (FrameNode) selection.getLastPathComponent();
                 StackTraceElement[] stack = node.getPath();
                 if (stack.length > 0) {
                     StackTraceElement e = stack[stack.length - 1];
-                    StackTree tree = pane.treeModel.getStackTree();
-                    for(StackTraceElement[] path: tree.enumDeepPaths()) {
+                    StackTree tree = treePane.treeModel.getStackTree();
+                    String classification = explorerPane.appliedFilter.getClassificationName();
+                    String bucket = explorerPane.appliedFilter.getSubclassName();
+                    for(StackTraceElement[] path: tree.enumDeepPaths(classification, bucket)) {
                         for(int n = path.length - 1; n > 0; --n) {
                             if (path[n].equals(e)) {
                                 StackTraceElement[] par = Arrays.copyOf(path, n);
-                                pane.expand(par);
+                                treePane.expand(par);
                                 break;
                             }
                         }

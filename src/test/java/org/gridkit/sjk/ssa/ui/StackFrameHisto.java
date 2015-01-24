@@ -17,7 +17,7 @@ import org.gridkit.util.formating.TextTable;
  *  
  * @author Alexey Ragozin (alexey.ragozin@gmail.com)
  */
-public class StackHisto {
+public class StackFrameHisto {
 
     public static Comparator<SiteInfo> BY_HITS = new HitComparator();
     public static Comparator<SiteInfo> BY_OCCURENCE = new OccurenceComparator();
@@ -27,6 +27,10 @@ public class StackHisto {
     private long frameCount = 0;
     
     public void feed(StackTraceElement[] trace) {
+        feed(trace, 1);
+    }
+    
+    public void feed(StackTraceElement[] trace, int count) {
         ++traceCount;
         Set<StackTraceElement> seen = new HashSet<StackTraceElement>();
         for(StackTraceElement e: trace) {
@@ -36,11 +40,22 @@ public class StackHisto {
                 si.site = e;
                 histo.put(e, si);
             }
-            si.hitCount += 1;
+            si.hitCount += count;
             ++frameCount;
             if (seen.add(si.site)) {
-                si.occurences += 1;
+                si.occurences += count;
             }
+        }
+    }
+    
+    public void feed(StackTree tree) {
+        feed(tree, null, null);
+    }
+    
+    public void feed(StackTree tree, String classification, String bucket) {
+        for(StackTraceElement[] trace: tree.enumDeepPaths(classification, bucket)) {
+            int count = tree.getBucketCount(classification, bucket, trace);
+            feed(trace, count);
         }
     }
     

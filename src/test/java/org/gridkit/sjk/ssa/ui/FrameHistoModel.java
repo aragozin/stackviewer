@@ -5,7 +5,7 @@ import java.util.Collection;
 
 import javax.swing.table.DefaultTableModel;
 
-import org.gridkit.sjk.ssa.ui.StackHisto.SiteInfo;
+import org.gridkit.sjk.ssa.ui.StackFrameHisto.SiteInfo;
 
 @SuppressWarnings("serial")
 public class FrameHistoModel extends DefaultTableModel {
@@ -19,7 +19,7 @@ public class FrameHistoModel extends DefaultTableModel {
         addColumn("Frame");  
     }
     
-    public void setHisto(StackHisto histo) {
+    public void setHisto(StackFrameHisto histo) {
         setRowCount(0);
         Collection<SiteInfo> ss = histo.getAllSites();
         SiteInfo[] sites = new SiteInfo[ss.size()];
@@ -27,7 +27,7 @@ public class FrameHistoModel extends DefaultTableModel {
         for(SiteInfo si: ss) {
             sites[n++] = si;
         }
-        Arrays.sort(sites, StackHisto.BY_OCCURENCE);
+        Arrays.sort(sites, StackFrameHisto.BY_OCCURENCE);
         long total = histo.getTraceCount();
         this.histo = sites;
         for(SiteInfo si: sites) {            

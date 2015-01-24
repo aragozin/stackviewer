@@ -2,6 +2,7 @@ package org.gridkit.sjk.ssa.ui;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -38,7 +39,16 @@ public class StackTree {
         return new Iterable<StackTraceElement[]>() {
             @Override
             public Iterator<StackTraceElement[]> iterator() {
-                return new DeepPathIterator();
+                return new DeepPathIterator(null, null);
+            }
+        };
+    }
+
+    public Iterable<StackTraceElement[]> enumDeepPaths(final String classification, final String bucket) {
+        return new Iterable<StackTraceElement[]>() {
+            @Override
+            public Iterator<StackTraceElement[]> iterator() {
+                return new DeepPathIterator(classification, bucket);
             }
         };
     }
@@ -224,35 +234,58 @@ public class StackTree {
     
     private class DeepPathIterator implements Iterator<StackTraceElement[]> {
         
+        String classification;
+        String bucket;
         List<Node> pointer = new ArrayList<Node>();
 
-        public DeepPathIterator() {
+        public DeepPathIterator(String classification, String bucket) {
+            this.classification = classification;
+            this.bucket = bucket;
             walkDown(root);
         }
 
         private void walkDown(Node node) {
             while(true) {
                 pointer.add(node);
-                if (node.children.isEmpty()) {
+                node = getNextNode(node.children.values(), null);
+                if (node == null) {
                     break;
-                }
-                else {
-                    node = node.children.entrySet().iterator().next().getValue();
                 }
             }            
         }
 
+        private Node getNextNode(Collection<Node> children, Node nextTo) {
+            Iterator<Node> it = children.iterator();
+            if (nextTo != null) {
+                while(it.hasNext()) {
+                    if (nextTo == it.next()) {
+                        break;
+                    }
+                }
+            }
+            while(it.hasNext()) {
+                Node node = it.next();
+                if (classification == null) {
+                    return node;
+                }
+                else {
+                    if (node.getHisto(classification).get(bucket) > 0) {
+                        return node;
+                    }
+                }
+            }
+            return null;
+        }
+        
         private void seek() {
             while(pointer.size() > 1) {
                 Node last = pointer.remove(pointer.size() - 1);
                 Node preLast = pointer.get(pointer.size() - 1);
-                SortedMap<StackTraceElement, Node> rest = preLast.children.tailMap(last.path[last.path.length - 1]);
-                if (rest.size() > 1) {
-                    Iterator<Node> it = rest.values().iterator();
-                    it.next(); // skip last
-                    walkDown(it.next());
+                Node next = getNextNode(preLast.children.values(), last);
+                if (next != null) {
+                    walkDown(next);
                     return;
-                }                
+                }
             }
         }
         

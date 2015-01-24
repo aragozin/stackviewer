@@ -1,9 +1,7 @@
 package org.gridkit.sjk.ssa.ui;
 
 import java.awt.Dialog.ModalityType;
-import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 
