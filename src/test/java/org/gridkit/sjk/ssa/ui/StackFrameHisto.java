@@ -101,6 +101,12 @@ public class StackFrameHisto {
         return tt.formatTextTableUnbordered(200);
     }
     
+    public void clear() {
+        traceCount = 0;
+        frameCount = 0;
+        histo.clear();
+    }
+    
     public static class SiteInfo {
         
         StackTraceElement site;

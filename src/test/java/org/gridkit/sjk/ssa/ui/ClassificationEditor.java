@@ -116,6 +116,10 @@ public class ClassificationEditor implements ClassificationModel {
         private String classificationName;
         private String subclassName;
         
+        public FilterRef() {
+            this(null);
+        }
+
         public FilterRef(String classificationName) {
             this.classificationName = classificationName;
         }
