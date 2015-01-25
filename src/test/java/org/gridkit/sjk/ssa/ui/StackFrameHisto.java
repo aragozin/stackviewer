@@ -1,11 +1,13 @@
 package org.gridkit.sjk.ssa.ui;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,7 +33,7 @@ public class StackFrameHisto {
     }
     
     public void feed(StackTraceElement[] trace, int count) {
-        ++traceCount;
+        traceCount += count;
         Set<StackTraceElement> seen = new HashSet<StackTraceElement>();
         for(StackTraceElement e: trace) {
             SiteInfo si = histo.get(e);
@@ -41,7 +43,7 @@ public class StackFrameHisto {
                 histo.put(e, si);
             }
             si.hitCount += count;
-            ++frameCount;
+            frameCount += count;
             if (seen.add(si.site)) {
                 si.occurences += count;
             }
@@ -53,12 +55,61 @@ public class StackFrameHisto {
     }
     
     public void feed(StackTree tree, String classification, String bucket) {
-        for(StackTraceElement[] trace: tree.enumDeepPaths(classification, bucket)) {
-            int count = tree.getBucketCount(classification, bucket, trace);
+//        int tc = 0;
+//        int dp = 0;
+//        Set<String> paths = new HashSet<String>();
+//        for(StackTraceElement[] trace: tree.enumTerminalPaths(classification, bucket)) {
+//            ++tc;  
+//            if (tc == 33) {
+//                new String("");
+//            }
+//            paths.add(fmt(trace));
+//        }
+//        int nn = 0;
+//        for(StackTraceElement[] trace: tree.enumDeepPaths(classification, bucket)) {
+//            ++dp;
+//            String path = fmt(trace);
+//            if (nn < 20 && !paths.contains(path)) {
+//                System.out.println("Miss DP: " + path);
+//                ++nn;
+//            }
+//        }
+//        System.out.println("HISTO " + classification + " / " + bucket + " TP: " + tc + " DP: " + dp);
+//        int n = 0;
+//        Iterator<StackTraceElement[]> ti = tree.enumTerminalPaths(classification, bucket).iterator(); 
+//        Iterator<StackTraceElement[]> di = tree.enumDeepPaths(classification, bucket).iterator(); 
+//        while(n < 100 && ti.hasNext() && di.hasNext()) {
+//            String tt = fmt(ti.next());
+//            String dt = fmt(di.next());
+//            if (!tt.equals(dt)) {
+//                System.out.println("TP[" + n + "]: " + tt);
+//                System.out.println("DP[" + n + "]: " + dt);
+//            }
+//            ++n;
+//        }
+        
+        for(StackTraceElement[] trace: tree.enumTerminalPaths(classification, bucket)) {            
+            int count = tree.getBucketTerminalCount(classification, bucket, trace);
             feed(trace, count);
         }
     }
     
+//    private String fmt(StackTraceElement[] next) {
+//        StringBuilder sb = new StringBuilder();
+//        for(StackTraceElement e: next) {
+//            if (sb.length() > 0) {
+//                sb.append(" > ");                
+//            }
+//            String className = e.getClassName();
+//            int c = className.lastIndexOf('.');
+//            if (c > 0) {
+//                className = className.substring(c + 1, className.length());
+//            }
+//            sb.append(className).append('.').append(e.getMethodName()).append("(").append(e.getLineNumber()).append(")");
+//        }
+//        return sb.toString();
+//    }
+
     public SiteInfo get(StackTraceElement frame) {
         return histo.get(frame);
     }

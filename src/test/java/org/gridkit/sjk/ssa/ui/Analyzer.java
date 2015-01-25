@@ -41,8 +41,8 @@ public class Analyzer {
 
         AnalyzerPane pane = new AnalyzerPane();
         pane.setTraceDump(source);
-//        pane.loadClassification(new FileReader("src/test/resources/wagon.scf"));
-        pane.loadClassification(new FileReader("src/test/resources/jboss-seam.scf"));
+        pane.loadClassification(new FileReader("src/test/resources/wagon.scf"));
+//        pane.loadClassification(new FileReader("src/test/resources/jboss-seam.scf"));
 
         JDialog dialog = new JDialog();
         dialog.add(pane);

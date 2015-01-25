@@ -22,6 +22,11 @@ public class StackTree {
         this.root.path = new StackTraceElement[0];
     }
 
+    public void clear() {
+        this.root = new Node();
+        this.root.path = new StackTraceElement[0];
+    }
+    
     /**
      * @param trace - root frame is last
      */
@@ -53,6 +58,15 @@ public class StackTree {
         };
     }
     
+    public Iterable<StackTraceElement[]> enumTerminalPaths(final String classification, final String bucket) {
+        return new Iterable<StackTraceElement[]>() {
+            @Override
+            public Iterator<StackTraceElement[]> iterator() {
+                return new TerminalPathIterator(classification, bucket);
+            }
+        };
+    }
+    
     public void addClassification(String name, StackTraceClassifier classificator) {
         classify(root, name, classificator);        
     }
@@ -61,6 +75,18 @@ public class StackTree {
         unclassify(root, name);
     }
     
+//    public void calculateFrameHisto(StackFrameHisto histo, String classification, String bucket) {
+//        appendToHisto(histo, root, classification, bucket);
+//    }
+//    
+//    private void appendToHisto(StackFrameHisto histo, Node node, String classification, String bucket) {
+//        if (node.path.length > 0) {
+//            StackTraceElement e = node.path[node.path.length - 1];
+//            histo.feed(new ST, count);
+//        }
+//        
+//    }
+
     public int getTotalCount(StackTraceElement[] path) {
         Node node = lookup(path);
         return node == null ? 0 : node.totalCount;        
@@ -73,10 +99,42 @@ public class StackTree {
     
     public int getBucketCount(String classification, String bucket, StackTraceElement[] path) {
         Node node = lookup(path);
-        return node == null ? 0 : node.getHisto(classification).get(bucket);                
+        if (node == null) {
+            return 0;
+        }
+        else {
+            if (classification == null) {
+                return node.totalCount;
+            }
+            else {
+                return node.getHisto(classification).get(bucket);
+            }
+        }
+    }
+
+    public int getBucketTerminalCount(String classification, String bucket, StackTraceElement[] path) {
+        Node node = lookup(path);
+        if (node == null) {
+            return 0;
+        }
+        else {
+            if (classification == null) {
+                return node.terminalCount;
+            }
+            else {
+                int terminal = node.getHisto(classification).get(bucket);
+                for(Node c: node.children.values()) {
+                    terminal -= c.getHisto(classification).get(bucket);
+                }
+                return terminal;
+            }
+        }
     }
 
     public int[] getBucketsCount(String classification, String[] buckets, StackTraceElement[] path) {
+        if (classification == null) {
+            throw new NullPointerException("Param 'classification' should not be null");
+        }
         Node node = lookup(path);
         int[] result = new int[buckets.length];
         if (node != null) {
@@ -184,6 +242,18 @@ public class StackTree {
             return EMPTY;
         }
         
+        public int getTerminalCount(String classification, String bucket) {
+            if (classification == null) {
+                return terminalCount;
+            }
+            else {
+                int terminal = getHisto(classification).get(bucket);
+                for(Node c: children.values()) {
+                    terminal -= c.getHisto(classification).get(bucket);
+                }
+                return terminal;
+            }
+        }        
     }
     
     private static final Subhistogram EMPTY = new Subhistogram();
@@ -296,7 +366,7 @@ public class StackTree {
 
         @Override
         public StackTraceElement[] next() {
-            if (pointer.size() == 1) {
+           if (pointer.size() == 1) {
                 throw new NoSuchElementException();
             }
             else {
@@ -306,6 +376,89 @@ public class StackTree {
             }
         }
 
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private class TerminalPathIterator implements Iterator<StackTraceElement[]> {
+        
+        String classification;
+        String bucket;
+        List<Node> pointer = new ArrayList<Node>();
+        
+        public TerminalPathIterator(String classification, String bucket) {
+            this.classification = classification;
+            this.bucket = bucket;
+            walkDown(root);
+        }
+        
+        private void walkDown(Node node) {
+            while(true) {
+                pointer.add(node);
+                node = getNextNode(node.children.values(), null);
+                if (node == null) {
+                    break;
+                }
+            }            
+        }
+        
+        private Node getNextNode(Collection<Node> children, Node nextTo) {
+            Iterator<Node> it = children.iterator();
+            if (nextTo != null) {
+                while(it.hasNext()) {
+                    if (nextTo == it.next()) {
+                        break;
+                    }
+                }
+            }
+            while(it.hasNext()) {
+                Node node = it.next();
+                if (classification == null) {
+                    return node;
+                }
+                else {
+                    if (node.getHisto(classification).get(bucket) > 0) {
+                        return node;
+                    }
+                }
+            }
+            return null;
+        }
+        
+        private void seek() {
+            while(pointer.size() > 1) {
+                Node last = pointer.remove(pointer.size() - 1);
+                Node preLast = pointer.get(pointer.size() - 1);
+                Node next = getNextNode(preLast.children.values(), last);
+                if (next != null) {
+                    walkDown(next);
+                    return;
+                }
+                if (preLast.getTerminalCount(classification, bucket) != 0) {
+                    break;
+                }
+            }
+        }
+        
+        @Override
+        public boolean hasNext() {
+            return pointer.size() > 1;
+        }
+        
+        @Override
+        public StackTraceElement[] next() {
+            if (pointer.size() == 1) {
+                throw new NoSuchElementException();
+            }
+            else {
+                StackTraceElement[] path = pointer.get(pointer.size() - 1).path;
+                seek();
+                return path;
+            }
+        }
+        
         @Override
         public void remove() {
             throw new UnsupportedOperationException();

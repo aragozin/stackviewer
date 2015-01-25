@@ -3,6 +3,7 @@ package org.gridkit.sjk.ssa.ui;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.List;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableModel;
 
+import org.gridkit.jvmtool.StackTraceReader;
 import org.gridkit.sjk.ssa.ui.ClassificationEditor.FilterRef;
 import org.gridkit.sjk.ssa.ui.StackFrameHisto.SiteInfo;
 
@@ -30,6 +32,8 @@ public class StackExplorerModel {
     
     public StackExplorerModel(ClassificationModel model) {        
         tree = new StackTree();
+        histo = new StackFrameHisto();
+        
         classification = model;
         classification.addClassificationListener(new PropertyChangeListener() {
             
@@ -56,6 +60,28 @@ public class StackExplorerModel {
         changeSupport.removePropertyChangeListener(propertyName, listener);
     }
     
+    public void updateTraceSource(StackTraceSource source) {
+        tree.clear();
+        cleanCachedClassifications();
+        StackTraceReader reader = source.getReader();
+        try {
+            if (!reader.isLoaded()) {
+                reader.loadNext();           
+            }
+            while(reader.isLoaded()) {
+                tree.append(reader.getTrace());
+                reader.loadNext();
+            }
+        }
+        catch(IOException e) {
+            throw new RuntimeException();
+        }
+        finally {        
+            refreshClassification();
+            changeSupport.firePropertyChange(PROP_STACK_SOURCE, null, null);
+        }
+    }
+    
     public StackTree getStackTree() {
         return tree;
     }
@@ -71,7 +97,11 @@ public class StackExplorerModel {
     public TableModel getFrameHistoModel() {
         return histoModel;
     }
-        
+
+    public FilterRef getFilter() {
+        return activeFilter;
+    }
+    
     public void setFilter(FilterRef ref) {
         if (!ref.equals(activeFilter)) {
             ensureClassification(ref);
@@ -86,10 +116,11 @@ public class StackExplorerModel {
     
     private void ensureClassification(FilterRef ref) {
         if (ref.getClassificationName() != null) {
-            if (!cachedFilters.contains(ref.classification())) {
+            String cn = ref.getClassificationName();
+            if (!cachedFilters.contains(cn)) {
                 StackTraceClassifier classifier = classification.getClassifier(ref.classification());
-                cachedFilters.add(ref.getClassificationName());
-                tree.addClassification(ref.getClassificationName(), classifier);
+                cachedFilters.add(cn);
+                tree.addClassification(cn, classifier);
             }
         }
     }
@@ -104,8 +135,9 @@ public class StackExplorerModel {
     private void refreshClassification() {
         FilterRef f = activeFilter;
         cleanCachedClassifications();
+        // set activeFilter to null (which is invalid value to ensure unconditional filter application)
+        activeFilter = null;
         if (classification.getFilter(f) != null) {
-            activeFilter = null;
             setFilter(f);
         }
         else {
@@ -113,6 +145,7 @@ public class StackExplorerModel {
         }        
     }
 
+    @SuppressWarnings("serial")
     private class FrameHistoModel extends AbstractTableModel {
 
         FrameHistoColumn[] columns = {
