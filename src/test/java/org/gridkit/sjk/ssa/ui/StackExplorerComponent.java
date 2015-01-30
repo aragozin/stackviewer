@@ -85,6 +85,7 @@ class StackExplorerComponent extends JPanel {
     
     private static final Color[] PALETTE = {FREQ_DEFAULT, FREQ_GREEN, FREQ_CYAN, FREQ_PURPLE, FREQ_ORANGE};
     private static final Color[] PALETTE_ABS = {FREQ_DEFAULT_ABS, FREQ_GREEN_ABS, FREQ_CYAN_ABS, FREQ_PURPLE_ABS, FREQ_ORANGE_ABS};
+    private static final String[] PALETE_NAME = {"", "Emerald", "Azure", "Purple", "Orange"};
     
     
     ClassificationModel classificationModel;
@@ -716,6 +717,19 @@ class StackExplorerComponent extends JPanel {
             this.model = model;
             this.config = config;
         }
+    }
+    
+    private class FilterChooserRow extends JPanel {
         
+        private ExtraFiltersChooser parent;
+        private String name;
+        private int index;
+        
+        private JLabel label;
+        private JComboBox comboBox;
+        
+        public FilterChooserRow(ExtraFiltersChooser parent, int index) {
+            
+        }        
     }
 }
