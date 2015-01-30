@@ -70,6 +70,22 @@ class StackExplorerComponent extends JPanel {
             return value == null ? null : value.toString();
         }
     };
+
+    private static final Color FREQ_DEFAULT = new Color(0x2222AA);
+    private static final Color FREQ_DEFAULT_ABS = new Color(0x2222EE);
+
+    private static final Color FREQ_GREEN = new Color(0x006837);
+    private static final Color FREQ_GREEN_ABS = FREQ_GREEN.brighter();
+    private static final Color FREQ_CYAN = new Color(0x008f8f);
+    private static final Color FREQ_CYAN_ABS = FREQ_CYAN.brighter();
+    private static final Color FREQ_PURPLE = new Color(0xdd1c77);
+    private static final Color FREQ_PURPLE_ABS = FREQ_PURPLE.brighter();
+    private static final Color FREQ_ORANGE = new Color(0xfdae61);
+    private static final Color FREQ_ORANGE_ABS = FREQ_ORANGE.brighter();
+    
+    private static final Color[] PALETTE = {FREQ_DEFAULT, FREQ_GREEN, FREQ_CYAN, FREQ_PURPLE, FREQ_ORANGE};
+    private static final Color[] PALETTE_ABS = {FREQ_DEFAULT_ABS, FREQ_GREEN_ABS, FREQ_CYAN_ABS, FREQ_PURPLE_ABS, FREQ_ORANGE_ABS};
+    
     
     ClassificationModel classificationModel;
     StackExplorerModel explorerModel;
@@ -679,5 +695,27 @@ class StackExplorerComponent extends JPanel {
             }
             return o1.compareTo(o2);
         }
-    }    
+    } 
+    
+    private static class ExtraFiltersConfig implements Cloneable {
+        
+        private FilterRef[] extraFilters = new FilterRef[4];
+        
+        public ExtraFiltersConfig clone() {
+            ExtraFiltersConfig cfg = (ExtraFiltersConfig) super.clone();
+            cfg.extraFilters = extraFilters.clone();
+        }
+    }
+    
+    private class ExtraFiltersChooser extends JPanel {
+        
+        private ClassificationModel model;
+        private ExtraFiltersConfig config;
+        
+        public ExtraFiltersChooser(ClassificationModel model, ExtraFiltersConfig config) {
+            this.model = model;
+            this.config = config;
+        }
+        
+    }
 }
