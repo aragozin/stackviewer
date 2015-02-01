@@ -3,6 +3,7 @@ package org.gridkit.sjk.ssa.ui;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Font;
+import java.awt.TextArea;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import java.io.File;
@@ -15,9 +16,11 @@ import java.util.List;
 import java.util.Map;
 
 import javax.swing.BorderFactory;
+import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JToolBar;
 import javax.swing.JTree;
 import javax.swing.tree.DefaultTreeCellRenderer;
 
@@ -42,7 +45,7 @@ public class ClassificationEditor implements ClassificationModel {
     boolean isValid;
     boolean isSaved;
     
-    EditorPanel editorPanel = new EditorPanel();
+    TreeEditorPanel editorPanel = new TreeEditorPanel();
     
     public void loadFromFile(File file) throws IOException {
         FileReader reader = new FileReader(file);
@@ -195,9 +198,36 @@ public class ClassificationEditor implements ClassificationModel {
     
     class EditorPanel extends JPanel {
         
-        JTree tree = new JTree();
+        JButton open = new JButton("Open");
+        JButton save = new JButton("Save");
+        JButton tree = new JButton("Tree");
+        JButton text = new JButton("Text");
+        JButton sync = new JButton("Sync >>");
+        
+        TreeEditorPanel treeEditor = new TreeEditorPanel();
         
         public EditorPanel() {
+            toolbar.
+        }
+    }
+
+    class TextEditorPanel extends JPanel {
+        
+        TextArea textArea = new TextArea();
+        
+        public TextEditorPanel() {
+            
+            setLayout(new BorderLayout());           
+            add(new JScrollPane(textArea), BorderLayout.CENTER);
+            setBorder(BorderFactory.createTitledBorder("Classification"));
+        }        
+    }
+    
+    class TreeEditorPanel extends JPanel {
+        
+        JTree tree = new JTree();
+        
+        public TreeEditorPanel() {
             tree.setModel(treeEditorModel);
             tree.setRootVisible(false);
             tree.setShowsRootHandles(true);
