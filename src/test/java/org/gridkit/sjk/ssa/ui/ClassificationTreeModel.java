@@ -4,7 +4,6 @@ import java.io.Reader;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +49,10 @@ public class ClassificationTreeModel extends DefaultTreeModel {
     
     public boolean hasErrors() {
         return !getRoot().errorMessages.isEmpty();
+    }
+
+    public List<String> getAllErrors() {
+        return new ArrayList<String>(getRoot().errorMessages.values());
     }
 
     public String getErrorFor(CommonNode node) {
@@ -124,9 +127,9 @@ public class ClassificationTreeModel extends DefaultTreeModel {
     
     public static class RootNode extends CommonNode {
         
-        private Map<CommonNode, String> errorMessages = new HashMap<ClassificationTreeModel.CommonNode, String>();
+        private Map<CommonNode, String> errorMessages = new LinkedHashMap<ClassificationTreeModel.CommonNode, String>();
         
-        private Map<String, Classification> sections = new HashMap<String, Classification>();
+        private Map<String, Classification> sections = new LinkedHashMap<String, Classification>();
         
         public Classification newClassification(String name) {
             if (sections.containsKey(name)) {

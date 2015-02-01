@@ -1,27 +1,46 @@
 package org.gridkit.sjk.ssa.ui;
 
 import java.awt.BorderLayout;
+import java.awt.CardLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Font;
 import java.awt.TextArea;
+import java.awt.event.ActionEvent;
+import java.awt.event.TextEvent;
+import java.awt.event.TextListener;
+import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
+import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.io.Reader;
+import java.io.StringReader;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.swing.AbstractAction;
+import javax.swing.Action;
 import javax.swing.BorderFactory;
+import javax.swing.Box;
 import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JFileChooser;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JToolBar;
+import javax.swing.JToggleButton;
 import javax.swing.JTree;
+import javax.swing.ToolTipManager;
 import javax.swing.tree.DefaultTreeCellRenderer;
 
 import org.gridkit.jvmtool.StackTraceFilter;
@@ -38,19 +57,28 @@ public class ClassificationEditor implements ClassificationModel {
     Map<FilterRef, StackTraceFilter> filters = new LinkedHashMap<FilterRef, StackTraceFilter>();
     Map<FilterRef, StackTraceClassifier> classifications = new LinkedHashMap<FilterRef, StackTraceClassifier>();
 
-    PropertyChangeSupport eventSupport = new PropertyChangeSupport(this);
+    PropertyChangeSupport classificationUpdateEvent = new PropertyChangeSupport(this);
+    PropertyChangeSupport internalUpdateEvent = new PropertyChangeSupport(this);
     
     ClassificationTreeModel treeEditorModel = new ClassificationTreeModel();
     boolean isInSync;
+    boolean isParsable;
     boolean isValid;
     boolean isSaved;
     
-    TreeEditorPanel editorPanel = new TreeEditorPanel();
+    boolean textIsShown;
+    
+    String editorContent = "";
+    String lastParsed = null;
+    List<String> editorParseErrors = new ArrayList<String>();
+    
+    EditorPanel editorPanel = new EditorPanel();
     
     public void loadFromFile(File file) throws IOException {
-        FileReader reader = new FileReader(file);
-        treeEditorModel.load(reader);
-        loadedFile = file;
+        String content = loadFile(file); 
+        treeEditorModel.load(new StringReader(content));
+        loadedFile = file;   
+        editorContent = content;
         treeEditorModel.validate();
         isValid = treeEditorModel.hasErrors();
         isSaved = true;
@@ -58,8 +86,10 @@ public class ClassificationEditor implements ClassificationModel {
     }
 
     public void loadFromReader(Reader reader) throws IOException {
-        treeEditorModel.load(reader);
+        String content = loadFile(reader); 
+        treeEditorModel.load(new StringReader(content));
         loadedFile = null;
+        editorContent = content;
         treeEditorModel.validate();
         isValid = treeEditorModel.hasErrors();
         isSaved = false;
@@ -88,12 +118,12 @@ public class ClassificationEditor implements ClassificationModel {
     
     @Override
     public void addClassificationListener(PropertyChangeListener listener) {
-        eventSupport.addPropertyChangeListener(listener);
+        classificationUpdateEvent.addPropertyChangeListener(listener);
     }
 
     @Override
     public void removeClassificationListener(PropertyChangeListener listener) {
-        eventSupport.removePropertyChangeListener(listener);
+        classificationUpdateEvent.removePropertyChangeListener(listener);
     }
     
     public JComponent getEditorComponent() {
@@ -111,9 +141,166 @@ public class ClassificationEditor implements ClassificationModel {
             }
             filters.put(fr, treeEditorModel.getFilter(fr));
         }
-        eventSupport.firePropertyChange("classification", null, null);
+        classificationUpdateEvent.firePropertyChange("classification", null, null);
     }
 
+    String loadFile(File file) throws IOException {
+        if (file.length() > 4 << 20) {
+            throw new IOException("File to large");
+        }
+        BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file), Charset.forName("UTF8")));
+        StringBuilder sb = new StringBuilder();
+        while(true) {
+            String line = reader.readLine();
+            if (line == null) {
+                break;
+            }
+            sb.append(line).append('\n');
+        }
+        return sb.toString();
+    }
+
+    String loadFile(Reader source) throws IOException {
+        BufferedReader reader = new BufferedReader(source);
+        StringBuilder sb = new StringBuilder();
+        while(true) {
+            String line = reader.readLine();
+            if (line == null) {
+                break;
+            }
+            sb.append(line).append('\n');
+        }
+        return sb.toString();
+    }
+    
+    void openFile() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setCurrentDirectory(new File("."));
+        chooser.setDialogType(JFileChooser.OPEN_DIALOG);
+        int option = chooser.showOpenDialog(getEditorComponent());
+        if (option == JFileChooser.APPROVE_OPTION) {
+            File file = chooser.getSelectedFile();
+            String lastContent = editorContent;
+            try {
+                String text = loadFile(file);
+                validateEditorText(text);
+                if (isValid) {
+                    loadedFile = file;
+                    isSaved = true;
+                    editorPanel.textEditor.textArea.setText(text);
+                    pushTreeChanges();
+                    fireInternalUpdate();
+                }
+                else {
+                    editorContent = lastContent;
+                    JOptionPane.showMessageDialog(getEditorComponent(), "Cannot load file\n" + editorParseErrors.toString(), "Cannot load to file!", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+            catch(Exception e) {
+                editorContent = lastContent;
+                JOptionPane.showMessageDialog(getEditorComponent(), "Cannot load file\n" + e.toString(), "Cannot load to file!", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    void saveFile() {
+        if (loadedFile != null) {
+            int r = JOptionPane.showConfirmDialog(getEditorComponent(), "Do you want to override file content\n\"" + loadedFile.getPath() + "\"", "Save classification", JOptionPane.YES_NO_OPTION);
+            if (r == JOptionPane.OK_OPTION) {
+                writeToFile(loadedFile);
+            }
+        }
+        else {
+            saveFileAs();
+        }
+    }
+
+    void saveFileAs() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogType(JFileChooser.SAVE_DIALOG);
+        chooser.setCurrentDirectory(new File("."));
+        int option = chooser.showSaveDialog(getEditorComponent());
+        if (option == JFileChooser.APPROVE_OPTION) {
+            File file = chooser.getSelectedFile();
+            writeToFile(file);
+        }
+    }
+
+    protected void writeToFile(File file) {
+        try {
+            FileOutputStream fos = new FileOutputStream(file);
+            OutputStreamWriter writer = new OutputStreamWriter(fos, Charset.forName("UTF8"));
+            writer.append(editorContent);
+            writer.close();
+            loadedFile = file;
+            isSaved = true;
+            fireInternalUpdate();
+        }
+        catch(Exception e) {
+            JOptionPane.showMessageDialog(getEditorComponent(), "Cannot save to file\n" + e.toString(), "Cannot save to file!", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    void switchToText() {
+        editorPanel.textEditor.textArea.setText(editorContent);
+        editorPanel.showText();
+    }
+
+    void switchToTree() {
+        validateEditorText(editorPanel.textEditor.textArea.getText());
+        if (isValid) {
+            editorPanel.showTree();
+        }
+    }
+    
+    void syncToModel() {
+        if (textIsShown) {
+            validateEditorText(editorPanel.textEditor.textArea.getText());            
+        }
+        if (isValid) {
+            pushTreeChanges();
+        }
+    }
+    
+    void validateEditorText(String text) {
+        if (!text.equals(lastParsed)) {
+            lastParsed = text;
+            editorParseErrors.clear();
+            try {
+                treeEditorModel.load(new StringReader(text));
+            }
+            catch(Exception e) {
+                Throwable x = e;
+                while(!(x instanceof IllegalArgumentException)) {
+                    x = x.getCause();
+                    if (x == null) {
+                        break;                        
+                    }
+                }
+                String msg = x == null ? e.getMessage() : x.getMessage();
+                editorParseErrors.add(msg);
+                isParsable = false;
+                isValid = false;
+                fireInternalUpdate();
+                return;
+            }
+            
+            isParsable = true;
+            
+            treeEditorModel.validate();
+            editorParseErrors.addAll(treeEditorModel.getAllErrors());
+            
+            isValid = editorParseErrors.isEmpty();
+            editorContent = text;
+            isSaved = false;
+            fireInternalUpdate();
+        }
+    }
+    
+    void fireInternalUpdate() {
+        internalUpdateEvent.firePropertyChange("event", null, null);
+    }
+    
     public static class FilterRef implements Comparable<FilterRef> {
         
         private String classificationName;
@@ -198,28 +385,200 @@ public class ClassificationEditor implements ClassificationModel {
     
     class EditorPanel extends JPanel {
         
-        JButton open = new JButton("Open");
-        JButton save = new JButton("Save");
-        JButton tree = new JButton("Tree");
-        JButton text = new JButton("Text");
-        JButton sync = new JButton("Sync >>");
-        
+        EditorToolBar toolbar = new EditorToolBar();
         TreeEditorPanel treeEditor = new TreeEditorPanel();
+        TextEditorPanel textEditor = new TextEditorPanel();
+        CardLayout card = new CardLayout();
         
         public EditorPanel() {
-            toolbar.
+            
+            setLayout(new BorderLayout());
+            JPanel editor = new JPanel();
+            editor.setLayout(card);
+            editor.add(treeEditor, "tree");
+            editor.add(textEditor, "text");
+            
+            add(toolbar, BorderLayout.NORTH);
+            add(editor, BorderLayout.CENTER);
+        
+            setBorder(BorderFactory.createTitledBorder("Classification"));
+            
+            showTree();
         }
+        
+        public void showTree() {
+            card.show(treeEditor.getParent(), "tree");
+            textIsShown = false;
+            fireInternalUpdate();
+        }
+
+        public void showText() {
+            card.show(textEditor.getParent(), "text");                        
+            textIsShown = true;
+            fireInternalUpdate();
+        }
+    }
+    
+    class EditorToolBar extends JPanel {
+        
+        Action open = new OpenAction();
+        Action save = new SaveAction();
+        Action tree = new TreeAction();
+        Action text = new TextAction();
+        Action sync = new SyncAction();
+        boolean showTree;
+        
+        EditorToolBar() {
+            Box box = Box.createHorizontalBox();
+            box.add(new JButton(open));
+            box.add(new JButton(save));
+            box.add(Box.createHorizontalGlue());
+            box.add(new JToggleButton(tree));
+            box.add(new JToggleButton(text));
+            box.add(Box.createHorizontalStrut(4));
+            box.add(new JButton(sync));
+            
+            setLayout(new BorderLayout());
+            add(box, BorderLayout.CENTER);
+            
+            internalUpdateEvent.addPropertyChangeListener(new PropertyChangeListener() {                
+                @Override
+                public void propertyChange(PropertyChangeEvent evt) {
+                    updateActions();                    
+                }
+            });
+        }
+
+        private void updateActions() {
+            
+            // update toggle buttons
+            tree.putValue(Action.SELECTED_KEY, !textIsShown);
+            text.putValue(Action.SELECTED_KEY, textIsShown);
+
+            // TODO allow to switch back even if model is not valid, but parsable
+            tree.setEnabled(isValid);
+
+            // sync state
+            sync.setEnabled(isValid && !isInSync);
+
+            save.setEnabled(!isSaved);
+        }
+        
+        class OpenAction extends AbstractAction {
+            
+            public OpenAction() {
+                super("Open");
+            }
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                openFile();                
+            }
+        }
+
+        class SaveAction extends AbstractAction {
+            
+            public SaveAction() {
+                super("Save");
+            }
+            
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                saveFile();                
+            }
+        }
+
+        class TreeAction extends AbstractAction {
+            
+            public TreeAction() {
+                super("Tree");
+            }
+            
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                switchToTree();                
+            }
+        }
+        
+        class TextAction extends AbstractAction {
+            
+            public TextAction() {
+                super("Text");
+            }
+            
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                switchToText();                
+            }
+        }        
+
+        class SyncAction extends AbstractAction {
+            
+            public SyncAction() {
+                super("Sync >>");
+            }
+            
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                syncToModel();                
+            }
+        }        
     }
 
     class TextEditorPanel extends JPanel {
         
         TextArea textArea = new TextArea();
+        JLabel status = new JLabel();
         
         public TextEditorPanel() {
             
             setLayout(new BorderLayout());           
-            add(new JScrollPane(textArea), BorderLayout.CENTER);
-            setBorder(BorderFactory.createTitledBorder("Classification"));
+            add(textArea, BorderLayout.CENTER);
+            Font font = Font.decode("Monospaced-14");
+            textArea.setFont(font);
+            
+            setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
+            JPanel statusArea = new JPanel();
+            statusArea.setLayout(new BorderLayout());
+            statusArea.add(status, BorderLayout.CENTER);
+            add(statusArea, BorderLayout.SOUTH);
+            
+            ToolTipManager.sharedInstance().registerComponent(status);
+            
+            internalUpdateEvent.addPropertyChangeListener(new PropertyChangeListener() {
+                
+                @Override
+                public void propertyChange(PropertyChangeEvent evt) {
+                    updateStatus();
+                }
+            });
+            
+            textArea.addTextListener(new TextListener() {
+                
+                @Override
+                public void textValueChanged(TextEvent e) {
+                    validateEditorText(textArea.getText());                    
+                }
+            });
+        }
+
+        protected void updateStatus() {
+            if (editorParseErrors.isEmpty()) {
+                status.setText("Parsed");
+                status.setForeground(Color.BLUE);
+            }
+            else {
+                status.setText("Cannot parse: " + editorParseErrors.get(0));
+                status.setForeground(Color.RED.darker());
+                StringBuilder sb = new StringBuilder();
+                for(String error: editorParseErrors) {
+                    if (sb.length() > 0) {
+                        sb.append('\n');
+                    }
+                    sb.append(error);
+                }
+                status.setToolTipText(sb.toString());                
+            }
         }        
     }
     
@@ -235,7 +594,6 @@ public class ClassificationEditor implements ClassificationModel {
             
             setLayout(new BorderLayout());           
             add(new JScrollPane(tree), BorderLayout.CENTER);
-            setBorder(BorderFactory.createTitledBorder("Classification"));
         }        
     }
     
