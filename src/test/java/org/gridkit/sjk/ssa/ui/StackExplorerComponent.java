@@ -8,12 +8,10 @@ import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
-import java.awt.Dialog.ModalityType;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.GridLayout;
 import java.awt.Toolkit;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
@@ -37,7 +35,6 @@ import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
-import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -48,7 +45,6 @@ import javax.swing.JToggleButton;
 import javax.swing.JTree;
 import javax.swing.SwingUtilities;
 import javax.swing.ToolTipManager;
-import javax.swing.border.Border;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.tree.DefaultTreeCellRenderer;
@@ -83,7 +79,7 @@ class StackExplorerComponent extends JPanel {
     private static final Color FREQ_DEFAULT = new Color(0x2222AA);
     private static final Color FREQ_DEFAULT_ABS = new Color(0x2222EE);
 
-    private static final Color FREQ_GREEN = new Color(0x00C08A);
+    private static final Color FREQ_GREEN = new Color(0x00C08A).darker();
     private static final Color FREQ_GREEN_ABS = FREQ_GREEN.brighter();
     private static final Color FREQ_ORANGE = new Color(0xE28714);
     private static final Color FREQ_ORANGE_ABS = FREQ_ORANGE.brighter();
@@ -136,9 +132,14 @@ class StackExplorerComponent extends JPanel {
         cards.add(frameHisto, "histo");
         showCard("tree");
 
+        setupFilterCombo();
         setupTreeHistoSwitch();
         installClassificationListener();
         installFilterListener();
+    }
+
+    private void setupFilterCombo() {
+        AutoCompleteDecorator.decorate(categoryCombo, newFilterRefToString());        
     }
 
     private void installFilterListener() {
@@ -174,6 +175,7 @@ class StackExplorerComponent extends JPanel {
     private void applyRootFilter(FilterRef filter) {
         System.out.println("Update tree filter: " + filter);
         explorerModel.setFilter(filter);
+        stackTree.toolbar.onFilterUpdated();
     }
 
     protected void setupTreeHistoSwitch() {
@@ -213,7 +215,6 @@ class StackExplorerComponent extends JPanel {
         List<FilterRef> model = new ArrayList<ClassificationEditor.FilterRef>(classificationModel.getAvailableFilters());
         model.add(0, new FilterRef(null));
         ModelUtils.updateComboBoxModel(categoryCombo.getModel(), model);
-        AutoCompleteDecorator.decorate(categoryCombo, newFilterRefToString());
     }
 
     private void showCard(String card) {
@@ -380,9 +381,12 @@ class StackExplorerComponent extends JPanel {
         
         JButton collapse = new JButton("[-]");
         JButton expand = new JButton("[+]");
-        JButton expandFrame = new JButton("[=]");
+        JButton expandFrame = new JButton("[=]");        
+        JComboBox relativeTo = new JComboBox();
 //        JButton configure = new JButton("[%]");
         JButton filters = new JButton("[f]");
+        
+        ExtraFiltersConfig colorfulConfig = new ExtraFiltersConfig();
         
         public StackTreeToolbar(StackTreePane pane) {
             this.treePane = pane;
@@ -396,17 +400,78 @@ class StackExplorerComponent extends JPanel {
             filters.setIcon(new ImageIcon(ClassLoader.getSystemResource("icons/4filters.png")));
             filters.setToolTipText("Configure colorful filters");
             
+            JLabel relLabel = new JLabel("% to ");
+            relLabel.setLabelFor(relativeTo);
+            relativeTo.setRenderer(Renderers.newFilterRefRenderer());
+            
             Box box = Box.createHorizontalBox();
             box.add(collapse);
             box.add(expand);
             box.add(expandFrame);
-            box.add(Box.createHorizontalStrut(4));
             box.add(Box.createHorizontalGlue());
+            box.add(relLabel);
+            box.add(relativeTo);
+            box.add(Box.createHorizontalStrut(4));
 //            box.add(configure);
             box.add(filters);
             
             setLayout(new BorderLayout());
             add(box, BorderLayout.CENTER);
+            
+            relativeTo.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    SwingUtilities.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            refreshTree();                            
+                        }
+                    });
+                }
+            });
+        }
+
+        public void onFilterUpdated() {
+            FilterRef ref = (FilterRef) explorerPanel.categoryCombo.getSelectedItem();
+            if (ref.getClassificationName() == null) {
+                ModelUtils.updateComboBoxModel(relativeTo.getModel(), Arrays.asList(ref));
+                relativeTo.setSelectedItem(ref);
+                relativeTo.setEnabled(false);
+            }
+            else if (ref.getSubclassName() == null) {
+                ModelUtils.updateComboBoxModel(relativeTo.getModel(), Arrays.asList(new FilterRef(null), ref));
+                relativeTo.setSelectedItem(ref);
+                relativeTo.setEnabled(true);                
+            }
+            else {
+                ModelUtils.updateComboBoxModel(relativeTo.getModel(), Arrays.asList(new FilterRef(null), ref.classification(), ref));
+                relativeTo.setSelectedItem(ref.classification());
+                relativeTo.setEnabled(true);                
+            }
+            refreshTree();
+        }
+
+        private void refreshTree() {
+            if (!colorfulConfig.isEmpty()) {
+                updateColorfulFilters();
+            }
+            FilterRef ref = (FilterRef) relativeTo.getSelectedItem();
+            JTree tree = explorerPanel.stackTree.tree;
+            if (!getRelativeRoot(tree).equals(ref)) {
+                setRelativeRoot(tree, ref);
+            }            
+            tree.repaint();
+        }
+
+        private void updateColorfulFilters() {
+            resetColorfulFilters(explorerPanel.stackTree.tree);
+            for(int i = 1; i != PALETTE.length; ++i) {
+                FilterRef ref = colorfulConfig.getFilter(i);
+                if (ref != null && ref.getClassificationName() != null) {
+                    ref = explorerModel.toRelative(ref);
+                    setColorfulFilter(explorerPanel.stackTree.tree, i, ref);
+                }
+            }
         }
 
         public ActionListener newCollapseAllAction() {
@@ -440,7 +505,8 @@ class StackExplorerComponent extends JPanel {
             return new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    showFilterConfigDialog(classificationModel, new ExtraFiltersConfig());
+                    colorfulConfig = showFilterConfigDialog(classificationModel, colorfulConfig);
+                    refreshTree();
                 }
             };
         }
@@ -593,10 +659,11 @@ class StackExplorerComponent extends JPanel {
             setIcon(null);
             
             if (value instanceof StackTreeModel.FrameInfo) {
+                FilterRef relativeTo = getRelativeRoot(tree);                
                 FrameInfo node = (FrameInfo) value;
                 StackTraceElement frame = node.getFrame();
                 if (frame != null) {
-                    int all = node.getTreeHitCount();
+                    int all = node.getTreeBucketCount(relativeTo.getClassificationName(), relativeTo.getSubclassName());
                     int count = node.getHitCount();
                     int par = node.getParentHitCount();
                     
@@ -604,10 +671,31 @@ class StackExplorerComponent extends JPanel {
                     double ptc = 1d * count / par;
                     double ptcAll = 1d * count / all;
                     
-                    String nodeText = "<html><b style=\"color:#2222AA\">" + pctFormat.format(ptc) + "</b><span style=\"color:#2222EE\"> (" + pctFormat.format(ptcAll) + ") </span> ";
-                    nodeText += frame.toString().replace(frame.getClassName(), shortClass);
-                    nodeText += "</html>";
-                    setText(nodeText);
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("<html><b style=\"color:#2222AA\">");
+                    sb.append(pctFormat.format(ptc));
+                    sb.append("</b><span style=\"color:#2222EE\"> (");
+                    sb.append(pctFormat.format(ptcAll));
+                    
+                    for(int i = 1; i < PALETTE.length; ++i) {
+                        FilterRef f = getColorfulFilter(tree, i);
+                        if (f != null) {
+                            int fc = node.getBucketCount(f.getClassificationName(), f.getSubclassName());
+                            if (fc > 0) {
+                                double fptc = 1d * fc / all;
+                                sb.append("<span style=\"color:#888888\"> </span><span style=\"color:#");
+                                sb.append(toHtmlCode(PALETTE[i]));
+                                sb.append("\">");
+                                sb.append(pctFormat.format(fptc));
+                                sb.append("</span>");
+                            }
+                        }
+                    }
+                    sb.append(") </span> ");
+                    
+                    sb.append(frame.toString().replace(frame.getClassName(), shortClass));
+                    sb.append("</html>");
+                    setText(sb.toString());
                     
                     String tooltipText = "<html>";
                     tooltipText += "<b>" + frame.toString() + "</b>";
@@ -707,6 +795,38 @@ class StackExplorerComponent extends JPanel {
         Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(text), null);
     }
     
+    static FilterRef getRelativeRoot(JTree tree) {
+        FilterRef ref = (FilterRef) tree.getClientProperty("stackTree.relativeTo");
+        return ref == null ? new FilterRef() : ref; 
+    }
+
+    static void setRelativeRoot(JTree tree, FilterRef ref) {
+        tree.putClientProperty("stackTree.relativeTo", ref);
+    }
+
+    static FilterRef getColorfulFilter(JTree tree, int n) {
+        FilterRef ref = (FilterRef) tree.getClientProperty("stackTree.colorful-" + n);
+        return ref; 
+    }
+    
+    static void resetColorfulFilters(JTree tree) {
+        for(int i = 1; i < PALETTE.length; ++i) {
+            setColorfulFilter(tree, i, null);
+        }
+    }
+
+    static void setColorfulFilter(JTree tree, int n, FilterRef ref) {
+        tree.putClientProperty("stackTree.colorful-" + n, ref);
+    }
+    
+    static String toHtmlCode(Color c) {
+        StringBuilder sb = new StringBuilder(6);
+        sb.append(Integer.toHexString(256 + c.getRed()).subSequence(1, 3));
+        sb.append(Integer.toHexString(256 + c.getGreen()).subSequence(1, 3));
+        sb.append(Integer.toHexString(256 + c.getBlue()).subSequence(1, 3));
+        return sb.toString();
+    }
+    
     private static class NaturalComparator implements Comparator<Comparable<Object>> {
 
         @Override
@@ -743,6 +863,15 @@ class StackExplorerComponent extends JPanel {
             extraFilters[n] = filter;
         }
 
+        public boolean isEmpty() {
+            for(FilterRef ref: extraFilters) {
+                if (ref != null) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
         public void clean() {
             for(int i = 0; i != extraFilters.length; ++i) {
                 extraFilters[i] = null;
@@ -848,7 +977,9 @@ class StackExplorerComponent extends JPanel {
         }        
         
         void setupBinding() {
-            ModelUtils.updateComboBoxModel(comboBox.getModel(), parent.model.getAvailableFilters());
+            List<FilterRef> availableFilters = new ArrayList<FilterRef>(parent.model.getAvailableFilters());
+            availableFilters.add(0, new FilterRef());
+            ModelUtils.updateComboBoxModel(comboBox.getModel(), availableFilters);
             AutoCompleteDecorator.decorate(comboBox, newFilterRefToString());
                         
             syncConfig();

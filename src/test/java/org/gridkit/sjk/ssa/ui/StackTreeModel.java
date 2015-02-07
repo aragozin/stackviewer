@@ -291,7 +291,7 @@ public class StackTreeModel extends DefaultTreeModel {
         StackTraceElement getFrame();
         
         int getTreeHitCount();
-        
+
         int getHitCount();
         
         int getParentHitCount();
@@ -300,8 +300,7 @@ public class StackTreeModel extends DefaultTreeModel {
 
         int getTreeBucketCount(String classification, String bucket);
 
-        int getParentBucketCount(String classification, String bucket);
-        
+        int getParentBucketCount(String classification, String bucket);        
     }
     
     private static class FrequencyComparator implements Comparator<FrameNode> {

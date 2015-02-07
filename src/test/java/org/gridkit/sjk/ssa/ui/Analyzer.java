@@ -26,7 +26,9 @@ public class Analyzer {
                 try {
 //                    return StackTraceCodec.newReader(new FileInputStream("case1.stp"));
 //                    return StackTraceCodec.newReader(new FileInputStream("C:/WarZone/docs/_tmp/threads-100u-1-1408727085233.stp"));
-                    return StackTraceCodec.newReader(new FileInputStream("C:/fire_at_will/vt_bench/dump_index_all_or_12k_sort.std"));
+//                    return StackTraceCodec.newReader(new FileInputStream("C:/fire_at_will/vt_bench/dump_index_all_or_12k_sort.std"));
+//                    return StackTraceCodec.newReader(new FileInputStream("dump_index_all_or_12k_sort_left.std"));
+                    return StackTraceCodec.newReader(new FileInputStream("dump_index_all_or_12k_sort_new.std"));
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
