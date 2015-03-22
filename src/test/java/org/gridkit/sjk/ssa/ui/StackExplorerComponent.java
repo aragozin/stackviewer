@@ -50,6 +50,7 @@ import javax.swing.event.DocumentListener;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 
+import org.gridkit.jvmtool.stacktrace.StackFrame;
 import org.gridkit.sjk.ssa.ui.ClassificationEditor.FilterRef;
 import org.gridkit.sjk.ssa.ui.StackTreeModel.FrameInfo;
 import org.gridkit.sjk.ssa.ui.StackTreeModel.FrameNode;
@@ -268,14 +269,14 @@ class StackExplorerComponent extends JPanel {
             treeModel.updateRoot(ref.getClassificationName(), ref.getSubclassName());
         }
         
-        public void expand(StackTraceElement[] path) {
+        public void expand(StackFrame[] path) {
             TreePath treePath = treeModel.toTreePath(path);
             if (treePath != null) {
                 doExpand(treePath);
             }
         }
 
-        public void collapse(StackTraceElement[] path) {
+        public void collapse(StackFrame[] path) {
             TreePath treePath = treeModel.toTreePath(path);
             if (treePath != null) {
                 tree.collapsePath(treePath);
@@ -306,7 +307,7 @@ class StackExplorerComponent extends JPanel {
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    StackTraceElement frame = rightClickNode.getFrame();
+                    StackFrame frame = rightClickNode.getFrame();
                     pushToClipboard(frame.toString());
                 }
 
@@ -324,9 +325,9 @@ class StackExplorerComponent extends JPanel {
 
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    StackTraceElement[] path = rightClickNode.getPath();
+                    StackFrame[] path = rightClickNode.getPath();
                     StringBuilder sb = new StringBuilder();
-                    for(StackTraceElement f: path) {
+                    for(StackFrame f: path) {
                         if (sb.length() > 0) {
                             sb.append('\n');
                         }
@@ -516,7 +517,7 @@ class StackExplorerComponent extends JPanel {
             FilterRef activeFilter = explorerModel.getFilter();
             String classification = activeFilter.getClassificationName();
             String bucket = activeFilter.getSubclassName();
-            for(StackTraceElement[] path: stree.enumDeepPaths(classification, bucket)) {
+            for(StackFrame[] path: stree.enumDeepPaths(classification, bucket)) {
                 treePane.expand(path);
             }            
         }
@@ -529,17 +530,17 @@ class StackExplorerComponent extends JPanel {
             TreePath selection = treePane.tree.getSelectionPath();
             if (selection != null) {
                 FrameNode node = (FrameNode) selection.getLastPathComponent();
-                StackTraceElement[] stack = node.getPath();
+                StackFrame[] stack = node.getPath();
                 if (stack.length > 0) {
-                    StackTraceElement e = stack[stack.length - 1];
+                    StackFrame e = stack[stack.length - 1];
                     StackTree tree = treePane.treeModel.getStackTree();
                     FilterRef activeFilter = explorerModel.getFilter();
                     String classification = activeFilter.getClassificationName();
                     String bucket = activeFilter.getSubclassName();
-                    for(StackTraceElement[] path: tree.enumDeepPaths(classification, bucket)) {
+                    for(StackFrame[] path: tree.enumDeepPaths(classification, bucket)) {
                         for(int n = path.length - 1; n > 0; --n) {
                             if (path[n].equals(e)) {
-                                StackTraceElement[] par = Arrays.copyOf(path, n);
+                                StackFrame[] par = Arrays.copyOf(path, n);
                                 treePane.expand(par);
                                 break;
                             }
@@ -661,7 +662,7 @@ class StackExplorerComponent extends JPanel {
             if (value instanceof StackTreeModel.FrameInfo) {
                 FilterRef relativeTo = getRelativeRoot(tree);                
                 FrameInfo node = (FrameInfo) value;
-                StackTraceElement frame = node.getFrame();
+                StackFrame frame = node.getFrame();
                 if (frame != null) {
                     int all = node.getTreeBucketCount(relativeTo.getClassificationName(), relativeTo.getSubclassName());
                     int count = node.getHitCount();

@@ -11,6 +11,8 @@ import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 
+import org.gridkit.jvmtool.stacktrace.StackFrame;
+
 @SuppressWarnings("serial")
 public class StackTreeModel extends DefaultTreeModel {
 
@@ -34,7 +36,7 @@ public class StackTreeModel extends DefaultTreeModel {
             setRoot(new Empty());
         }
         else {
-            setRoot(new FrameNode(tree, new StackTraceElement[0], filterClassification, filterBucket));
+            setRoot(new FrameNode(tree, new StackFrame[0], filterClassification, filterBucket));
         }
     }
     
@@ -45,10 +47,10 @@ public class StackTreeModel extends DefaultTreeModel {
     }
 
     protected void updateRoot(String filterClassification, String filterBucket) {
-        setRoot(new FrameNode(tree, new StackTraceElement[0], filterClassification, filterBucket));
+        setRoot(new FrameNode(tree, new StackFrame[0], filterClassification, filterBucket));
     }
     
-    public TreePath toTreePath(StackTraceElement[] path) {
+    public TreePath toTreePath(StackFrame[] path) {
         Object root =  getRoot();
         if (root instanceof FrameNode) {
             List<FrameNode> treePath = new ArrayList<FrameNode>();
@@ -119,18 +121,18 @@ public class StackTreeModel extends DefaultTreeModel {
     public static class FrameNode implements TreeNode, FrameInfo {
 
         StackTree tree;
-        StackTraceElement[] path;
+        StackFrame[] path;
         String classification;
         String bucket;
         
-        public FrameNode(StackTree tree, StackTraceElement[] path, String classification, String bucket) {
+        public FrameNode(StackTree tree, StackFrame[] path, String classification, String bucket) {
             this.tree = tree;
             this.path = path;
             this.classification = classification;
             this.bucket = bucket;                    
         }
         
-        private int getHitCount(StackTraceElement[] path) {
+        private int getHitCount(StackFrame[] path) {
             if (classification == null) {
                 return tree.getTotalCount(path);
             }
@@ -140,18 +142,18 @@ public class StackTreeModel extends DefaultTreeModel {
         }
         
         @Override
-        public StackTraceElement[] getPath() {
+        public StackFrame[] getPath() {
             return path;
         }
 
         @Override
-        public StackTraceElement getFrame() {
+        public StackFrame getFrame() {
             return path.length == 0 ? null : path[path.length - 1];
         }
         
         @Override
         public int getTreeHitCount() {
-            return getHitCount(new StackTraceElement[0]);
+            return getHitCount(new StackFrame[0]);
         }
 
         @Override
@@ -171,7 +173,7 @@ public class StackTreeModel extends DefaultTreeModel {
 
         @Override
         public int getTreeBucketCount(String classification, String bucket) {
-            return tree.getBucketCount(classification, bucket, new StackTraceElement[0]);
+            return tree.getBucketCount(classification, bucket, new StackFrame[0]);
         }
         
         @Override
@@ -184,14 +186,14 @@ public class StackTreeModel extends DefaultTreeModel {
             return childList()[childIndex];
         }
 
-        private StackTraceElement[] child(StackTraceElement[] par, StackTraceElement child) {
-            StackTraceElement[] path = Arrays.copyOf(par, par.length + 1);
+        private StackFrame[] child(StackFrame[] par, StackFrame child) {
+            StackFrame[] path = Arrays.copyOf(par, par.length + 1);
             path[par.length] = child;
             return path;
         }
 
-        private StackTraceElement[] parent(StackTraceElement[] path) {
-            StackTraceElement[] par = Arrays.copyOf(path, path.length - 1);
+        private StackFrame[] parent(StackFrame[] path) {
+            StackFrame[] par = Arrays.copyOf(path, path.length - 1);
             return par;
         }
 
@@ -221,7 +223,7 @@ public class StackTreeModel extends DefaultTreeModel {
         }
 
         public FrameNode[] childList() {
-            StackTraceElement[] d = tree.getDescendants(path);
+            StackFrame[] d = tree.getDescendants(path);
             FrameNode[] list = new FrameNode[d.length];
             for(int i = 0; i != list.length; ++i) {
                 list[i] = new FrameNode(tree, child(path, d[i]), classification, bucket);
@@ -286,9 +288,9 @@ public class StackTreeModel extends DefaultTreeModel {
     
     public interface FrameInfo {
         
-        StackTraceElement[] getPath();
+        StackFrame[] getPath();
         
-        StackTraceElement getFrame();
+        StackFrame getFrame();
         
         int getTreeHitCount();
 
@@ -310,7 +312,7 @@ public class StackTreeModel extends DefaultTreeModel {
         }
     }
     
-    public interface StackTraceFilter {
+    public interface StackTreeFilter {
         
         public boolean evaluate(FrameInfo frameInfo);
         

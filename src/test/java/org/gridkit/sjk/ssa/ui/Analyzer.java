@@ -9,8 +9,8 @@ import javax.swing.JDialog;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
-import org.gridkit.jvmtool.StackTraceCodec;
-import org.gridkit.jvmtool.StackTraceReader;
+import org.gridkit.jvmtool.stacktrace.StackTraceCodec;
+import org.gridkit.jvmtool.stacktrace.StackTraceReader;
 import org.junit.Before;
 import org.junit.Test;
 

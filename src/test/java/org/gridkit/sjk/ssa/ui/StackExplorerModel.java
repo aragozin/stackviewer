@@ -4,6 +4,7 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import java.io.IOException;
+import java.lang.Thread.State;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -11,11 +12,16 @@ import java.util.List;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableModel;
 
-import org.gridkit.jvmtool.StackTraceFilter;
-import org.gridkit.jvmtool.StackTraceReader;
+import org.gridkit.jvmtool.stacktrace.AbstractStackFrameArray;
+import org.gridkit.jvmtool.stacktrace.CounterArray;
+import org.gridkit.jvmtool.stacktrace.CounterCollection;
+import org.gridkit.jvmtool.stacktrace.StackFrame;
+import org.gridkit.jvmtool.stacktrace.StackFrameList;
+import org.gridkit.jvmtool.stacktrace.StackTraceReader;
+import org.gridkit.jvmtool.stacktrace.ThreadSnapshot;
 import org.gridkit.sjk.ssa.ui.ClassificationEditor.FilterRef;
-import org.gridkit.sjk.ssa.ui.ClassificationTreeModel.Classification;
 import org.gridkit.sjk.ssa.ui.StackFrameHisto.SiteInfo;
+import org.gridkit.sjk.ssa.ui.StackTreeModel.StackTreeFilter;
 
 public class StackExplorerModel {
 
@@ -72,7 +78,7 @@ public class StackExplorerModel {
                 reader.loadNext();           
             }
             while(reader.isLoaded()) {
-                tree.append(reader.getTrace());
+                tree.append(reader.getStackTrace().toArray());
                 reader.loadNext();
             }
         }
@@ -130,7 +136,7 @@ public class StackExplorerModel {
                 n = cachedRelativeFilters.size();
                 cachedRelativeFilters.add(ref.classification());
                 StackTraceClassifier inner = classification.getClassifier(ref.classification());
-                StackTraceFilter filter = classification.getFilter(activeFilter);
+                StackTreeFilter filter = classification.getFilter(activeFilter);
                 if (filter == null || inner == null) {
                     throw new IllegalArgumentException("One of filters is missing: " + activeFilter + " " + ref);
                 }
@@ -267,24 +273,76 @@ public class StackExplorerModel {
         }
     }
     
-    private static class FilteredClassifier implements StackTraceClassifier {
+    private static class FilteredClassifier implements SimpleTraceClassifier {
         
-        private final StackTraceFilter filter;
+        private final StackTreeFilter filter;
         private final StackTraceClassifier classifier;
+        private final DummyThreadSnapshot threadSnap;
         
-        public FilteredClassifier(StackTraceFilter filter, StackTraceClassifier classifier) {
+        public FilteredClassifier(StackTreeFilter filter, StackTraceClassifier classifier) {
             this.filter = filter;
             this.classifier = classifier;
         }
 
         @Override
-        public String classify(StackTraceElement[] trace) {
-            if (filter.evaluate(trace)) {
+        public String classify(StackFrame[] trace) {
+            threadSnap.array = trace;
+            if (filter.evaluate(threadSnap)) {
                 return classifier.classify(trace);
             }
             else {
                 return null;
             }
+        }
+    }
+    
+    private class DummyThreadSnapshot extends AbstractStackFrameArray implements ThreadSnapshot {
+
+        private StackFrame[] array;
+        
+        @Override
+        protected StackFrame[] array() {
+            return array;
+        }
+
+        @Override
+        protected int from() {
+            return 0;
+        }
+
+        @Override
+        protected int to() {
+            return array.length;
+        }
+
+        @Override
+        public long threadId() {
+            return 0;
+        }
+
+        @Override
+        public String threadName() {
+            return null;
+        }
+
+        @Override
+        public long timestamp() {
+            return 0;
+        }
+
+        @Override
+        public StackFrameList stackTrace() {
+            return this;
+        }
+
+        @Override
+        public State threadState() {
+            return null;
+        }
+
+        @Override
+        public CounterCollection counters() {
+            return CounterArray.EMPTY;
         }
     }
 }

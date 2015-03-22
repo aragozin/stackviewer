@@ -54,7 +54,7 @@ public class ClassificationEditor implements ClassificationModel {
 
     File loadedFile;
     
-    Map<FilterRef, StackTraceFilter> filters = new LinkedHashMap<FilterRef, StackTraceFilter>();
+    Map<FilterRef, StackTreeFilter> filters = new LinkedHashMap<FilterRef, StackTreeFilter>();
     Map<FilterRef, StackTraceClassifier> classifications = new LinkedHashMap<FilterRef, StackTraceClassifier>();
 
     PropertyChangeSupport classificationUpdateEvent = new PropertyChangeSupport(this);
@@ -107,7 +107,7 @@ public class ClassificationEditor implements ClassificationModel {
     }
     
     @Override
-    public StackTraceFilter getFilter(FilterRef ref) {
+    public StackTreeFilter getFilter(FilterRef ref) {
         return filters.get(ref);
     }
 

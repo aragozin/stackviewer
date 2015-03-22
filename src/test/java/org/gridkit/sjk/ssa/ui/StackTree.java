@@ -10,64 +10,65 @@ import java.util.NoSuchElementException;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import org.gridkit.jvmtool.stacktrace.StackFrame;
+
 public class StackTree {
 
-    private static final StackTraceElement[] ROOT = new StackTraceElement[0];
+    private static final StackFrame[] ROOT = new StackFrame[0];
     private static final FrameComparator FRAME_COMPARATOR = new FrameComparator();
     
     private Node root;
     
     public StackTree() {
-        this.root = new Node();
-        this.root.path = new StackTraceElement[0];
+        clear();
     }
 
     public void clear() {
         this.root = new Node();
-        this.root.path = new StackTraceElement[0];
+        this.root.path = ROOT;
     }
     
     /**
      * @param trace - root frame is last
      */
-    public void append(StackTraceElement[] trace) {
+    public void append(StackFrame[] trace) {
         root.totalCount++;
         append(root, trace, trace.length - 1);
     }
     
-    public StackTraceElement[] getDescendants(StackTraceElement[] path) {
+    public StackFrame[] getDescendants(StackFrame[] path) {
         Node node = lookup(path);
         return node == null ? ROOT : node.children.keySet().toArray(ROOT);
     }
 
-    public Iterable<StackTraceElement[]> enumDeepPaths() {
-        return new Iterable<StackTraceElement[]>() {
+    public Iterable<StackFrame[]> enumDeepPaths() {
+        return new Iterable<StackFrame[]>() {
             @Override
-            public Iterator<StackTraceElement[]> iterator() {
+            public Iterator<StackFrame[]> iterator() {
                 return new DeepPathIterator(null, null);
             }
         };
     }
 
-    public Iterable<StackTraceElement[]> enumDeepPaths(final String classification, final String bucket) {
-        return new Iterable<StackTraceElement[]>() {
+    public Iterable<StackFrame[]> enumDeepPaths(final String classification, final String bucket) {
+        return new Iterable<StackFrame[]>() {
             @Override
-            public Iterator<StackTraceElement[]> iterator() {
+            public Iterator<StackFrame[]> iterator() {
                 return new DeepPathIterator(classification, bucket);
             }
         };
     }
     
-    public Iterable<StackTraceElement[]> enumTerminalPaths(final String classification, final String bucket) {
-        return new Iterable<StackTraceElement[]>() {
+    public Iterable<StackFrame[]> enumTerminalPaths(final String classification, final String bucket) {
+        return new Iterable<StackFrame[]>() {
             @Override
-            public Iterator<StackTraceElement[]> iterator() {
+            public Iterator<StackFrame[]> iterator() {
                 return new TerminalPathIterator(classification, bucket);
             }
         };
     }
     
-    public void addClassification(String name, StackTraceClassifier classificator) {
+    public void addClassification(String name, SimpleTraceClassifier classificator) {
         classify(root, name, classificator);        
     }
     
@@ -87,17 +88,17 @@ public class StackTree {
 //        
 //    }
 
-    public int getTotalCount(StackTraceElement[] path) {
+    public int getTotalCount(StackFrame[] path) {
         Node node = lookup(path);
         return node == null ? 0 : node.totalCount;        
     }
 
-    public int getTerminalCount(StackTraceElement[] path) {
+    public int getTerminalCount(StackFrame[] path) {
         Node node = lookup(path);
         return node == null ? 0 : node.terminalCount;        
     }
     
-    public int getBucketCount(String classification, String bucket, StackTraceElement[] path) {
+    public int getBucketCount(String classification, String bucket, StackFrame[] path) {
         Node node = lookup(path);
         if (node == null) {
             return 0;
@@ -112,7 +113,7 @@ public class StackTree {
         }
     }
 
-    public int getBucketTerminalCount(String classification, String bucket, StackTraceElement[] path) {
+    public int getBucketTerminalCount(String classification, String bucket, StackFrame[] path) {
         Node node = lookup(path);
         if (node == null) {
             return 0;
@@ -131,7 +132,7 @@ public class StackTree {
         }
     }
 
-    public int[] getBucketsCount(String classification, String[] buckets, StackTraceElement[] path) {
+    public int[] getBucketsCount(String classification, String[] buckets, StackFrame[] path) {
         if (classification == null) {
             throw new NullPointerException("Param 'classification' should not be null");
         }
@@ -146,7 +147,7 @@ public class StackTree {
         return result;                
     }
     
-    private Node lookup(StackTraceElement[] path) {
+    private Node lookup(StackFrame[] path) {
         Node n = root;
         for(int i = 0; i != path.length; ++i) {
             n = n.children.get(path[i]);
@@ -157,8 +158,8 @@ public class StackTree {
         return n;
     }
 
-    private void append(Node node, StackTraceElement[] trace, int at) {
-        StackTraceElement frame = trace[at];
+    private void append(Node node, StackFrame[] trace, int at) {
+        StackFrame frame = trace[at];
         Node next = node.children.get(frame);
         if (next == null) {
             next = new Node();
@@ -175,7 +176,7 @@ public class StackTree {
         }
     }
 
-    private void classify(Node node, String name, StackTraceClassifier classificator) {
+    private void classify(Node node, String name, SimpleTraceClassifier classificator) {
 
         node.addHisto(name);
         Subhistogram subhisto = node.getHisto(name);
@@ -204,10 +205,10 @@ public class StackTree {
     
     private static class Node {
         
-        StackTraceElement[] path;
+        StackFrame[] path;
         int totalCount;
         int terminalCount;
-        SortedMap<StackTraceElement, Node> children = new TreeMap<StackTraceElement, Node>(FRAME_COMPARATOR);
+        SortedMap<StackFrame, Node> children = new TreeMap<StackFrame, Node>(FRAME_COMPARATOR);
         
         Subhistogram[] subhistos = new Subhistogram[0];
         
@@ -302,7 +303,7 @@ public class StackTree {
         }        
     }
     
-    private class DeepPathIterator implements Iterator<StackTraceElement[]> {
+    private class DeepPathIterator implements Iterator<StackFrame[]> {
         
         String classification;
         String bucket;
@@ -365,12 +366,12 @@ public class StackTree {
         }
 
         @Override
-        public StackTraceElement[] next() {
+        public StackFrame[] next() {
            if (pointer.size() == 1) {
                 throw new NoSuchElementException();
             }
             else {
-                StackTraceElement[] path = pointer.get(pointer.size() - 1).path;
+                StackFrame[] path = pointer.get(pointer.size() - 1).path;
                 seek();
                 return path;
             }
@@ -382,7 +383,7 @@ public class StackTree {
         }
     }
 
-    private class TerminalPathIterator implements Iterator<StackTraceElement[]> {
+    private class TerminalPathIterator implements Iterator<StackFrame[]> {
         
         String classification;
         String bucket;
@@ -448,12 +449,12 @@ public class StackTree {
         }
         
         @Override
-        public StackTraceElement[] next() {
+        public StackFrame[] next() {
             if (pointer.size() == 1) {
                 throw new NoSuchElementException();
             }
             else {
-                StackTraceElement[] path = pointer.get(pointer.size() - 1).path;
+                StackFrame[] path = pointer.get(pointer.size() - 1).path;
                 seek();
                 return path;
             }
@@ -465,10 +466,10 @@ public class StackTree {
         }
     }
     
-    private static class FrameComparator implements Comparator<StackTraceElement> {
+    private static class FrameComparator implements Comparator<StackFrame> {
 
         @Override
-        public int compare(StackTraceElement o1, StackTraceElement o2) {
+        public int compare(StackFrame o1, StackFrame o2) {
             int n = compare(o1.getClassName(), o2.getClassName());
             if (n != 0) {
                 return n;
@@ -481,7 +482,7 @@ public class StackTree {
             if (n != 0) {
                 return n;
             }
-            n = compare(o1.getFileName(), o2.getFileName());
+            n = compare(o1.getSourceFile(), o2.getSourceFile());
             return 0;
         }
 

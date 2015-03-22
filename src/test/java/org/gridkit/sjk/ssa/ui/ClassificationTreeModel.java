@@ -11,9 +11,11 @@ import java.util.Map;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 
-import org.gridkit.jvmtool.StackTraceFilter;
-import org.gridkit.jvmtool.StackTraceFilter.ElementMatcher;
-import org.gridkit.jvmtool.StackTraceFilterHelper;
+import org.gridkit.jvmtool.stacktrace.StackFrame;
+import org.gridkit.jvmtool.stacktrace.analytics.ClassificatorAST;
+import org.gridkit.jvmtool.stacktrace.analytics.ClassificatorAST.Filter;
+import org.gridkit.jvmtool.stacktrace.analytics.ClassificatorAST.Root;
+import org.gridkit.sjk.ssa.ui.StackTreeModel.StackTreeFilter;
 
 @SuppressWarnings("serial")
 public class ClassificationTreeModel extends DefaultTreeModel {
@@ -28,16 +30,32 @@ public class ClassificationTreeModel extends DefaultTreeModel {
         return (RootNode)super.getRoot();
     }
 
-    public void load(Reader source) {
+    public void assign(ClassificatorAST.Root ast) {
         RootNode node = new RootNode();
-        new ClassificationCodec(node).parse(source);
+        initRoot(node, ast);
         setRoot(node);
     }
 
-    public void store(Writer target) {
+    protected void initRoot(RootNode node, Root ast) {
+        for(String name: ast.classifications.keySet()) {
+            Classification cl = new Classification(name);
+            ClassificatorAST.Classification astCl = ast.classifications.get(name);
+            initClassification(cl, astCl);
+            node.sections.put(name, cl);
+            node.add(cl);
+        }        
+    }
+
+    private void initClassification(Classification cl, org.gridkit.jvmtool.stacktrace.analytics.ClassificatorAST.Classification astCl) {
+        cl.rootFilter = convertFilter(astCl.rootFilter);
         
     }
-    
+
+    private RootFilter convertFilter(Filter rootFilter) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
     public void validate() {
         getRoot().errorMessages.clear();
         
@@ -59,7 +77,7 @@ public class ClassificationTreeModel extends DefaultTreeModel {
         return getRoot().errorMessages.get(node);
     }
 
-    private static StackTraceFilter markErrorNode(CommonNode node, String error) {
+    private static StackTreeFilter markErrorNode(CommonNode node, String error) {
         while(!(node instanceof RootNode)) {
             node = (CommonNode) node.getParent();
         }
@@ -101,7 +119,7 @@ public class ClassificationTreeModel extends DefaultTreeModel {
         return filters;
     }
     
-    public StackTraceFilter getFilter(ClassificationEditor.FilterRef ref) {
+    public StackTreeFilter getFilter(ClassificationEditor.FilterRef ref) {
         String cn = ref.getClassificationName();
         List<Classification> cl = getRoot().getChildren();
         for(Classification c: cl) {
@@ -175,13 +193,13 @@ public class ClassificationTreeModel extends DefaultTreeModel {
         }
         
         public StackTraceClassifier makeClassifier() {
-            StackTraceFilter filter = rootFilter.makeFilter();
+            StackTreeFilter filter = rootFilter.makeFilter();
             List<Subclass> subclasses = getSubclasses();            
             if (subclasses.isEmpty()) {
                 return new StackClassifier(filter, Collections.singletonMap("other", StackTraceFilterHelper.trueFilter()));
             }
             else {
-                Map<String, StackTraceFilter> buckets = new LinkedHashMap<String, StackTraceFilter>();
+                Map<String, StackTreeFilter> buckets = new LinkedHashMap<String, StackTreeFilter>();
                 for(Subclass sc: subclasses) {
                     String name = sc.getName();
                     if (buckets.containsKey(name)) {
@@ -197,7 +215,7 @@ public class ClassificationTreeModel extends DefaultTreeModel {
     public static class RootFilter extends ConjunctionNode {
 
         @Override
-        public StackTraceFilter makeFilter() {
+        public StackTreeFilter makeFilter() {
             if (getChildCount() == 0) {
                 return StackTraceFilterHelper.trueFilter();
             }
@@ -220,7 +238,7 @@ public class ClassificationTreeModel extends DefaultTreeModel {
         }
 
         @Override
-        public StackTraceFilter makeFilter() {
+        public StackTreeFilter makeFilter() {
             if (getChildCount() == 0) {
                 return StackTraceFilterHelper.trueFilter();
             }
@@ -243,7 +261,7 @@ public class ClassificationTreeModel extends DefaultTreeModel {
         }                
 
         @Override
-        public StackTraceFilter makeFilter() {
+        public StackTreeFilter makeFilter() {
             return StackTraceFilterHelper.createElementMatcherFilter(StackTraceFilterHelper.createElementMatcher(pattern));
         }
         
@@ -278,16 +296,16 @@ public class ClassificationTreeModel extends DefaultTreeModel {
 
     public static interface StackTracePredicate {
 
-        public StackTraceFilter makeFilter();
+        public StackTreeFilter makeFilter();
         
     }
     
     public static class DisjunctionNode extends CompositePredicateNode {
 
         @Override
-        public StackTraceFilter makeFilter() {
+        public StackTreeFilter makeFilter() {
             List<CommonNode> children = getChildren();
-            List<StackTraceFilter> filters = new ArrayList<StackTraceFilter>();
+            List<StackTreeFilter> filters = new ArrayList<StackTreeFilter>();
             for(CommonNode cn: children) {
                 if (cn instanceof StackTracePredicate) {
                     filters.add(((StackTracePredicate)cn).makeFilter());
@@ -305,9 +323,9 @@ public class ClassificationTreeModel extends DefaultTreeModel {
     public static class ConjunctionNode extends CompositePredicateNode {
 
         @Override
-        public StackTraceFilter makeFilter() {
+        public StackTreeFilter makeFilter() {
             List<CommonNode> children = getChildren();
-            List<StackTraceFilter> filters = new ArrayList<StackTraceFilter>();
+            List<StackTreeFilter> filters = new ArrayList<StackTreeFilter>();
             for(CommonNode cn: children) {
                 if (cn instanceof StackTracePredicate) {
                     filters.add(((StackTracePredicate)cn).makeFilter());
@@ -345,7 +363,7 @@ public class ClassificationTreeModel extends DefaultTreeModel {
         }
         
         @Override
-        public StackTraceFilter makeFilter() {
+        public StackTreeFilter makeFilter() {
             List<FramePattern> framePatterns = stackFragment.getChildren();
             List<String> patterns = new ArrayList<String>();
             
@@ -359,7 +377,7 @@ public class ClassificationTreeModel extends DefaultTreeModel {
             
             ElementMatcher matcher = StackTraceFilterHelper.createElementMatcher(patterns);
 
-            StackTraceFilter predicate = followPredicate.makeFilter();
+            StackTreeFilter predicate = followPredicate.makeFilter();
             
             if (followPredicate.negative) {
                 return StackTraceFilterHelper.createLastNotFollowedMatcher(matcher, predicate);
@@ -405,22 +423,22 @@ public class ClassificationTreeModel extends DefaultTreeModel {
         }
     }
     
-    static class StackClassifier extends org.gridkit.jvmtool.StackTraceClassifier implements StackTraceClassifier {
+    static class StackClassifier implements StackTraceClassifier {
      
-        public StackClassifier(StackTraceFilter root, Map<String, StackTraceFilter> filters) {
+        public StackClassifier(SimpleTraceFilter root, Map<String, SimpleTraceFilter> filters) {
             super(root, filters);
         }
 
         @Override
-        public String classify(StackTraceElement[] trace) {
+        public String classify(StackFrame[] trace) {
             return super.classify(trace);
         }        
     }
     
-    static class ErrorFilterStub implements StackTraceFilter {
+    static class ErrorFilterStub implements SimpleTraceFilter {
 
         @Override
-        public boolean evaluate(StackTraceElement[] trace) {
+        public boolean evaluate(StackFrame[] trace) {
             throw new UnsupportedOperationException("Error node invoked");
         }        
     }
