@@ -1,6 +1,4 @@
-Data processing and graphing utilites
+Graphical tool to analyzer thread dumps
 =========
 
-A bunch of handy stuff to process and visualize results
-from performance/load testing.
 
