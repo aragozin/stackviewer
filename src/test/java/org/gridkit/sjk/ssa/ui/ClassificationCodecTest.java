@@ -1,21 +1,23 @@
 package org.gridkit.sjk.ssa.ui;
 
-import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.IOException;
 
-import org.gridkit.sjk.ssa.ui.ClassificationTreeModel.RootNode;
+import org.gridkit.sjk.ssa.ui.ClassificationCodec.ParseError;
+import org.gridkit.sjk.ssa.ui.ClassificationCodec.ParseResult;
 import org.junit.Test;
 
 public class ClassificationCodecTest {
     
     @Test
-    public void parse() throws FileNotFoundException {
-        ClassificationTreeModel model = new ClassificationTreeModel();
-        RootNode root = model.getRoot();
+    public void parse() throws IOException {
         FileReader reader = new FileReader("src/test/resources/jboss-seam.scf");
-        ClassificationCodec codec = new ClassificationCodec(root);
-        codec.parse(reader);
-        System.out.println(root);
+        ClassificationCodec codec = new ClassificationCodec();
+        ParseResult result = codec.parse(IOHelper.read(reader));
+        for(ParseError e: result.errors) {
+            System.err.println(e);
+        }
+        System.out.println(result.ast);
     }
     
 }

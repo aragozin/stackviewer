@@ -32,6 +32,18 @@ public class Analyzer2 {
                                              new JButton("Debug Tool"),    // Component
                                              ToolWindowAnchor.LEFT);       // Anchor
 
+        toolWindowManager.registerToolWindow("Debug2",       // Id
+                "Debug2 Tool",                 // Title
+                null,                         // Icon
+                new JButton("Debug2 Tool"),    // Component
+                ToolWindowAnchor.LEFT);       // Anchor
+
+        toolWindowManager.registerToolWindow("Debug3",       // Id
+                "Debug3 Tool",                 // Title
+                null,                         // Icon
+                new JButton("Debug3 Tool"),    // Component
+                ToolWindowAnchor.LEFT);       // Anchor
+        
         // Made all tools available
         for (ToolWindow window : toolWindowManager.getToolWindows())
             window.setAvailable(true);

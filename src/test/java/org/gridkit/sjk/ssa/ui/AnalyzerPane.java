@@ -71,37 +71,6 @@ public class AnalyzerPane extends JPanel {
         classificationEditor.loadFromReader(reader);
     }
 
-//    private void rebuildTree() throws IOException {
-//        tree = new StackTree();
-//        StackTraceReader reader = source.getReader();
-//        if (!reader.isLoaded()) {
-//            reader.loadNext();
-//        }
-//        while(true) {
-//            tree.append(reader.getTrace());
-//            if (!reader.loadNext()) {
-//                break;
-//            }
-//        }        
-//        explorerPane.stackTree.treeModel.setTree(tree);
-//    }
-//
-//    private void rebuildHisto() throws IOException {
-//        histo = new StackFrameHisto();
-//        StackTraceReader reader = source.getReader();
-//        if (!reader.isLoaded()) {
-//            reader.loadNext();
-//        }
-//        while(true) {
-//            histo.feed(reader.getTrace());
-//            if (!reader.loadNext()) {
-//                break;
-//            }
-//        }
-//        explorerPane.frameHisto.histoModel.setHisto(histo);
-//        explorerPane.frameHisto.table.packAll();
-//    }
-    
     public void setClassificationFile(File file) throws IOException {
         classificationEditor.loadFromFile(file);
     }

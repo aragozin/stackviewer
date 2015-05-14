@@ -69,25 +69,16 @@ public class StackTree {
     }
     
     public void addClassification(String name, SimpleTraceClassifier classificator) {
-        classify(root, name, classificator);        
+        long time = System.currentTimeMillis();
+        classify(root, name, classificator);
+        time = System.currentTimeMillis() - time;
+        System.out.println("StackTree: " + name + " - " + time + "ms");
     }
     
     public void removeClassification(String name) {
         unclassify(root, name);
     }
     
-//    public void calculateFrameHisto(StackFrameHisto histo, String classification, String bucket) {
-//        appendToHisto(histo, root, classification, bucket);
-//    }
-//    
-//    private void appendToHisto(StackFrameHisto histo, Node node, String classification, String bucket) {
-//        if (node.path.length > 0) {
-//            StackTraceElement e = node.path[node.path.length - 1];
-//            histo.feed(new ST, count);
-//        }
-//        
-//    }
-
     public int getTotalCount(StackFrame[] path) {
         Node node = lookup(path);
         return node == null ? 0 : node.totalCount;        

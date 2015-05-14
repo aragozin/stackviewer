@@ -123,7 +123,7 @@ class StackExplorerComponent extends JPanel {
         controls.setBorder(createCompoundBorder(createEtchedBorder(), createEmptyBorder(3, 3, 3, 3)));
         add(controls, BorderLayout.NORTH);
         add(cards, BorderLayout.CENTER);
-        setBorder(BorderFactory.createTitledBorder("Samples"));
+//        setBorder(BorderFactory.createTitledBorder("Samples"));
 
         stackTree = new StackTreePane();
         frameHisto = new FrameHistoPane();

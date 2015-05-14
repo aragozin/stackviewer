@@ -7,7 +7,9 @@ import java.io.IOException;
 import java.lang.Thread.State;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableModel;
@@ -19,9 +21,9 @@ import org.gridkit.jvmtool.stacktrace.StackFrame;
 import org.gridkit.jvmtool.stacktrace.StackFrameList;
 import org.gridkit.jvmtool.stacktrace.StackTraceReader;
 import org.gridkit.jvmtool.stacktrace.ThreadSnapshot;
+import org.gridkit.jvmtool.stacktrace.analytics.ThreadSnapshotFilter;
 import org.gridkit.sjk.ssa.ui.ClassificationEditor.FilterRef;
 import org.gridkit.sjk.ssa.ui.StackFrameHisto.SiteInfo;
-import org.gridkit.sjk.ssa.ui.StackTreeModel.StackTreeFilter;
 
 public class StackExplorerModel {
 
@@ -135,12 +137,12 @@ public class StackExplorerModel {
             if (n < 0) {
                 n = cachedRelativeFilters.size();
                 cachedRelativeFilters.add(ref.classification());
-                StackTraceClassifier inner = classification.getClassifier(ref.classification());
-                StackTreeFilter filter = classification.getFilter(activeFilter);
+                SimpleTraceClassifier inner = classification.getClassifier(ref.classification());
+                SimpleTraceFilter filter = classification.getFilter(activeFilter);
                 if (filter == null || inner == null) {
                     throw new IllegalArgumentException("One of filters is missing: " + activeFilter + " " + ref);
                 }
-                StackTraceClassifier rel = new FilteredClassifier(filter, inner);
+                SimpleTraceClassifier rel = new FilteredClassifier(filter, inner);
                 String name = "{REL:" + n + "}" + ref.getClassificationName();
                 ensureClassification(name, rel);
             }
@@ -153,14 +155,14 @@ public class StackExplorerModel {
         if (ref.getClassificationName() != null) {
             String cn = ref.getClassificationName();
             if (!cachedFilters.contains(cn)) {
-                StackTraceClassifier classifier = classification.getClassifier(ref.classification());
+                SimpleTraceClassifier classifier = classification.getClassifier(ref.classification());
                 cachedFilters.add(cn);
                 tree.addClassification(cn, classifier);
             }
         }
     }
 
-    private void ensureClassification(String classification, StackTraceClassifier classifier) {
+    private void ensureClassification(String classification, SimpleTraceClassifier classifier) {
         String cn = classification;
         if (!cachedFilters.contains(cn)) {
             cachedFilters.add(cn);
@@ -273,30 +275,60 @@ public class StackExplorerModel {
         }
     }
     
+    private static class Classifier implements SimpleTraceFilter, SimpleTraceClassifier {
+
+        ThreadSnapshotFilter rootFilter;
+        Map<String, ThreadSnapshotFilter> subclasses = new LinkedHashMap<String, ThreadSnapshotFilter>();
+        DummyThreadSnapshot dummy = new DummyThreadSnapshot();
+        
+        @Override
+        public String classify(StackFrame[] list) {
+            dummy.array = list;
+            if (rootFilter != null && !rootFilter.evaluate(dummy)) {
+                return null;
+            }
+            for(String key: subclasses.keySet()) {
+                ThreadSnapshotFilter filter = subclasses.get(key);
+                if (filter.evaluate(dummy)) {
+                    return key;
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public boolean evaluate(StackFrame[] list) {
+            return classify(list) != null;
+        }
+    }
+    
     private static class FilteredClassifier implements SimpleTraceClassifier {
         
-        private final StackTreeFilter filter;
-        private final StackTraceClassifier classifier;
-        private final DummyThreadSnapshot threadSnap;
+        private final SimpleTraceFilter filter;
+        private final SimpleTraceClassifier classifier;
         
-        public FilteredClassifier(StackTreeFilter filter, StackTraceClassifier classifier) {
+        public FilteredClassifier(SimpleTraceFilter filter, SimpleTraceClassifier classifier) {
             this.filter = filter;
             this.classifier = classifier;
         }
 
         @Override
         public String classify(StackFrame[] trace) {
-            threadSnap.array = trace;
-            if (filter.evaluate(threadSnap)) {
+            if (filter.evaluate(trace)) {
                 return classifier.classify(trace);
             }
             else {
                 return null;
             }
         }
+
+        @Override
+        public boolean evaluate(StackFrame[] list) {
+            return classify(list) != null;
+        }
     }
     
-    private class DummyThreadSnapshot extends AbstractStackFrameArray implements ThreadSnapshot {
+    private static class DummyThreadSnapshot extends AbstractStackFrameArray implements ThreadSnapshot {
 
         private StackFrame[] array;
         

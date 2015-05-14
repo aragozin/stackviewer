@@ -3,6 +3,7 @@
 
 +JDBC
     org.jboss.jca.adapters.jdbc.
+    javax.jdbc
 
 +Hibernate (autoFlush)
     org.hibernate.internal.SessionImpl.autoFlushIfRequired
@@ -23,33 +24,33 @@
     java.util.ResourceBundle.getObject
 
 +Seam bean intercepter - inject/disinject/outject
-    !REQUIRE
-        !LAST
+    !REQUIRE ALL
+        !LAST FRAME
             org.jboss.seam.core.BijectionInterceptor.aroundInvoke
             org.jboss.seam.core.SynchronizationInterceptor.aroundInvoke
             !NOT FOLLOWED
-                **.proceed
+            **.proceed
         !ANY
             org.jboss.seam.Component.inject
             org.jboss.seam.Component.disinject
             org.jboss.seam.Component.outject
 
 +Seam bean intercepter - lock contention
-    !REQUIRE
-        !LAST
+    !REQUIRE ALL
+        !LAST FRAME
             org.jboss.seam.core.BijectionInterceptor.aroundInvoke
             org.jboss.seam.core.SynchronizationInterceptor.aroundInvoke
             !NOT FOLLOWED
-                **.proceed
+            **.proceed
         java.util.concurrent.locks.ReentrantLock
 
 +Seam bean intercepter - other
-    !REQUIRE
-        !LAST
+    !REQUIRE ALL
+        !LAST FRAME
             org.jboss.seam.core.BijectionInterceptor.aroundInvoke
             org.jboss.seam.core.SynchronizationInterceptor.aroundInvoke
             !NOT FOLLOWED
-                **.proceed
+            **.proceed
 
 +LifecycleImpl.execute
     com.sun.faces.lifecycle.LifecycleImpl.execute
@@ -61,3 +62,12 @@
     org.apache.catalina.servlets.DefaultServlet.doGet
 
 +Other
+
+[Collections]
+    *
+
++java.util.regex
+    java.util.regex
+    
++java.util
+    java.util

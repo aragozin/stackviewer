@@ -3,7 +3,6 @@ package org.gridkit.sjk.ssa.ui;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Font;
 import java.awt.TextArea;
 import java.awt.event.ActionEvent;
@@ -20,9 +19,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
-import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,30 +36,27 @@ import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
 import javax.swing.JToggleButton;
-import javax.swing.JTree;
 import javax.swing.ToolTipManager;
-import javax.swing.tree.DefaultTreeCellRenderer;
 
-import org.gridkit.jvmtool.StackTraceFilter;
-import org.gridkit.sjk.ssa.ui.ClassificationTreeModel.Classification;
-import org.gridkit.sjk.ssa.ui.ClassificationTreeModel.FollowPredicate;
-import org.gridkit.sjk.ssa.ui.ClassificationTreeModel.FramePattern;
-import org.gridkit.sjk.ssa.ui.ClassificationTreeModel.Subclass;
+import org.gridkit.jvmtool.stacktrace.analytics.CachingFilterFactory;
+import org.gridkit.jvmtool.stacktrace.analytics.ClassificatorAST;
+import org.gridkit.jvmtool.stacktrace.analytics.ThreadSnapshotFilter;
+import org.gridkit.sjk.ssa.ui.ClassificationCodec.ParseError;
+import org.gridkit.sjk.ssa.ui.ClassificationCodec.ParseResult;
 
 @SuppressWarnings("serial")
 public class ClassificationEditor implements ClassificationModel {
 
     File loadedFile;
     
-    Map<FilterRef, StackTreeFilter> filters = new LinkedHashMap<FilterRef, StackTreeFilter>();
-    Map<FilterRef, StackTraceClassifier> classifications = new LinkedHashMap<FilterRef, StackTraceClassifier>();
+    Map<FilterRef, SimpleTraceFilter> filters = new LinkedHashMap<FilterRef, SimpleTraceFilter>();
+    Map<FilterRef, SimpleTraceClassifier> classifications = new LinkedHashMap<FilterRef, SimpleTraceClassifier>();
 
     PropertyChangeSupport classificationUpdateEvent = new PropertyChangeSupport(this);
     PropertyChangeSupport internalUpdateEvent = new PropertyChangeSupport(this);
     
-    ClassificationTreeModel treeEditorModel = new ClassificationTreeModel();
+    ClassificationCodec codec = new ClassificationCodec();
     boolean isInSync;
     boolean isParsable;
     boolean isValid;
@@ -70,29 +66,39 @@ public class ClassificationEditor implements ClassificationModel {
     
     String editorContent = "";
     String lastParsed = null;
-    List<String> editorParseErrors = new ArrayList<String>();
+    ParseResult parseResult;
     
     EditorPanel editorPanel = new EditorPanel();
     
     public void loadFromFile(File file) throws IOException {
-        String content = loadFile(file); 
-        treeEditorModel.load(new StringReader(content));
+        String content = loadFile(file);
+        loadContent(file, content);
+    }
+
+    protected void loadContent(File file, String content) {
+        List<String> lines = splitLines(content);
+        
+        ParseResult result = codec.parse(lines);
         loadedFile = file;   
         editorContent = content;
-        treeEditorModel.validate();
-        isValid = treeEditorModel.hasErrors();
+
+        isValid = result.errors.isEmpty();
         isSaved = true;
+        parseResult = result;
         pushTreeChanges();
     }
 
     public void loadFromReader(Reader reader) throws IOException {
         String content = loadFile(reader); 
-        treeEditorModel.load(new StringReader(content));
+
+        List<String> lines = splitLines(content);
+        ParseResult result = codec.parse(lines);
         loadedFile = null;
         editorContent = content;
-        treeEditorModel.validate();
-        isValid = treeEditorModel.hasErrors();
-        isSaved = false;
+
+        isValid = result.errors.isEmpty();
+        isSaved = true;
+        parseResult = result;
         pushTreeChanges();
     }
     
@@ -107,12 +113,12 @@ public class ClassificationEditor implements ClassificationModel {
     }
     
     @Override
-    public StackTreeFilter getFilter(FilterRef ref) {
+    public SimpleTraceFilter getFilter(FilterRef ref) {
         return filters.get(ref);
     }
 
     @Override
-    public StackTraceClassifier getClassifier(FilterRef ref) {
+    public SimpleTraceClassifier getClassifier(FilterRef ref) {
         return classifications.get(ref);
     }
     
@@ -131,15 +137,23 @@ public class ClassificationEditor implements ClassificationModel {
     }
     
     private void pushTreeChanges() {
-        if (treeEditorModel.hasErrors()) {
+        if (parseResult.ast == null) {
             throw new IllegalArgumentException("Tree model has errors");
         }
+        classifications.clear();
         filters.clear();
-        for(FilterRef fr: treeEditorModel.getFilters()) {
-            if (!fr.isSubclass()) {
-                classifications.put(fr, treeEditorModel.getClassifier(fr));
+        CachingFilterFactory factory = new CachingFilterFactory();
+        ClassificatorAST.Root ast = parseResult.ast;
+        for(ClassificatorAST.Classification cls: ast.classifications.values()) {
+            ThreadSnapshotFilter rootf = cls.rootFilter != null ? factory.build(cls.rootFilter) : null;
+            SimpleTraceClassifier classifer = FilterTools.toSimpleClassifier(rootf, cls.subclasses, factory);
+            classifications.put(new FilterRef(cls.name), classifer);
+            filters.put(new FilterRef(cls.name), classifer);
+            for(String subc: cls.subclasses.keySet()) {
+                ThreadSnapshotFilter f = factory.build(cls.subclasses.get(subc));
+                SimpleTraceFilter sf = FilterTools.toSimpleFilter(f);
+                filters.put(new FilterRef(cls.name, subc), sf);
             }
-            filters.put(fr, treeEditorModel.getFilter(fr));
         }
         classificationUpdateEvent.firePropertyChange("classification", null, null);
     }
@@ -157,6 +171,7 @@ public class ClassificationEditor implements ClassificationModel {
             }
             sb.append(line).append('\n');
         }
+        reader.close();
         return sb.toString();
     }
 
@@ -172,6 +187,12 @@ public class ClassificationEditor implements ClassificationModel {
         }
         return sb.toString();
     }
+
+    List<String> splitLines(String text) {
+        String[] l = text.split("\\n");
+        return Arrays.asList(l);
+    }
+    
     
     void openFile() {
         JFileChooser chooser = new JFileChooser();
@@ -193,7 +214,7 @@ public class ClassificationEditor implements ClassificationModel {
                 }
                 else {
                     editorContent = lastContent;
-                    JOptionPane.showMessageDialog(getEditorComponent(), "Cannot load file\n" + editorParseErrors.toString(), "Cannot load to file!", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(getEditorComponent(), "Cannot load file\n" + parseResult.errors.toString(), "Cannot load to file!", JOptionPane.ERROR_MESSAGE);
                 }
             }
             catch(Exception e) {
@@ -265,35 +286,19 @@ public class ClassificationEditor implements ClassificationModel {
     void validateEditorText(String text) {
         if (!text.equals(lastParsed)) {
             lastParsed = text;
-            editorParseErrors.clear();
-            try {
-                treeEditorModel.load(new StringReader(text));
-            }
-            catch(Exception e) {
-                Throwable x = e;
-                while(!(x instanceof IllegalArgumentException)) {
-                    x = x.getCause();
-                    if (x == null) {
-                        break;                        
-                    }
-                }
-                String msg = x == null ? e.getMessage() : x.getMessage();
-                editorParseErrors.add(msg);
-                isParsable = false;
-                isValid = false;
-                fireInternalUpdate();
-                return;
-            }
             
-            isParsable = true;
-            
-            treeEditorModel.validate();
-            editorParseErrors.addAll(treeEditorModel.getAllErrors());
-            
-            isValid = editorParseErrors.isEmpty();
+            List<String> lines = splitLines(text);
+            ParseResult result = codec.parse(lines);
+            loadedFile = null;
             editorContent = text;
+
+            isValid = result.errors.isEmpty();
             isSaved = false;
-            fireInternalUpdate();
+            parseResult = result;
+            if (isValid) {
+                pushTreeChanges();
+            }
+            internalUpdateEvent.firePropertyChange("event", null, null);
         }
     }
     
@@ -401,9 +406,9 @@ public class ClassificationEditor implements ClassificationModel {
             add(toolbar, BorderLayout.NORTH);
             add(editor, BorderLayout.CENTER);
         
-            setBorder(BorderFactory.createTitledBorder("Classification"));
+//            setBorder(BorderFactory.createTitledBorder("Classification"));
             
-            showTree();
+            showText();
         }
         
         public void showTree() {
@@ -563,15 +568,19 @@ public class ClassificationEditor implements ClassificationModel {
         }
 
         protected void updateStatus() {
-            if (editorParseErrors.isEmpty()) {
+            if (parseResult == null) {
+                status.setText("No text");
+                status.setForeground(Color.RED);                
+            }
+            else if (parseResult.errors.isEmpty()) {
                 status.setText("Parsed");
                 status.setForeground(Color.BLUE);
             }
             else {
-                status.setText("Cannot parse: " + editorParseErrors.get(0));
+                status.setText("Cannot parse: " + parseResult.errors.get(0));
                 status.setForeground(Color.RED.darker());
                 StringBuilder sb = new StringBuilder();
-                for(String error: editorParseErrors) {
+                for(ParseError error: parseResult.errors) {
                     if (sb.length() > 0) {
                         sb.append('\n');
                     }
@@ -584,80 +593,80 @@ public class ClassificationEditor implements ClassificationModel {
     
     class TreeEditorPanel extends JPanel {
         
-        JTree tree = new JTree();
-        
-        public TreeEditorPanel() {
-            tree.setModel(treeEditorModel);
-            tree.setRootVisible(false);
-            tree.setShowsRootHandles(true);
-            tree.setCellRenderer(new ClassificationNodeRenderer());
-            
-            setLayout(new BorderLayout());           
-            add(new JScrollPane(tree), BorderLayout.CENTER);
-        }        
+//        JTree tree = new JTree();
+//        
+//        public TreeEditorPanel() {
+//            tree.setModel(treeEditorModel);
+//            tree.setRootVisible(false);
+//            tree.setShowsRootHandles(true);
+//            tree.setCellRenderer(new ClassificationNodeRenderer());
+//            
+//            setLayout(new BorderLayout());           
+//            add(new JScrollPane(tree), BorderLayout.CENTER);
+//        }        
     }
     
-    private class ClassificationNodeRenderer extends DefaultTreeCellRenderer {
-        
-        Font defaultFont;
-        Font monospaceFont;
-        
-        @Override
-        public Component getTreeCellRendererComponent(JTree tree, Object value, boolean selected, boolean expanded, boolean leaf, int row, boolean hasFocus) {
-
-            if (defaultFont == null) {
-                defaultFont = getFont();
-                if (defaultFont != null) {
-                    monospaceFont = Font.decode(Font.MONOSPACED).deriveFont(defaultFont.getSize2D());
-                }
-            }
-            if (getFont() != defaultFont) {
-                setFont(defaultFont);
-            }
-            
-            super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus);
-
-            setIcon(null);
-            
-            if (value instanceof ClassificationTreeModel.Classification) {
-                Classification node = (Classification) value;
-                setText("<html><b>" + node.getName() + "</b></html>");
-            }
-            else if (value instanceof ClassificationTreeModel.Subclass) {
-                Subclass node = (Subclass) value;
-                setText(node.getName());                
-            }
-            else if (value instanceof ClassificationTreeModel.FramePattern) {
-                FramePattern node = (FramePattern) value;                
-                setFont(monospaceFont);
-                setText(node.getPattern());
-            }
-            else if (value instanceof ClassificationTreeModel.RootFilter) {
-                setText("<html><i>filter</i></html>");
-            }
-            else if (value instanceof ClassificationTreeModel.LastQuantor) {
-                setText("<html><span style=\"color: #B44\"><b>LAST</b></span></html>");
-            }
-            else if (value instanceof ClassificationTreeModel.StackFragment) {
-                setText("<html><i>element</i></html>");
-            }
-            else if (value instanceof ClassificationTreeModel.FollowPredicate) {
-                FollowPredicate fp = (FollowPredicate) value;
-                if (fp.isNegative()) {
-                    setText("<html><i>not followed by</i></html>");
-                }
-                else {
-                    setText("<html><i>followed by</i></html>");
-                }
-            }
-            else if (value instanceof ClassificationTreeModel.DisjunctionNode) {
-                setText("<html><span style=\"color: #B44\"><b>AND</b></span></html>");
-            }
-            else if (value instanceof ClassificationTreeModel.ConjunctionNode) {
-                setText("<html><span style=\"color: #B44\"><b>OR</b></span></html>");
-            }
-            
-            return this;
-        }
-    }
+//    private class ClassificationNodeRenderer extends DefaultTreeCellRenderer {
+//        
+//        Font defaultFont;
+//        Font monospaceFont;
+//        
+//        @Override
+//        public Component getTreeCellRendererComponent(JTree tree, Object value, boolean selected, boolean expanded, boolean leaf, int row, boolean hasFocus) {
+//
+//            if (defaultFont == null) {
+//                defaultFont = getFont();
+//                if (defaultFont != null) {
+//                    monospaceFont = Font.decode(Font.MONOSPACED).deriveFont(defaultFont.getSize2D());
+//                }
+//            }
+//            if (getFont() != defaultFont) {
+//                setFont(defaultFont);
+//            }
+//            
+//            super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus);
+//
+//            setIcon(null);
+//            
+//            if (value instanceof ClassificationTreeModel.Classification) {
+//                Classification node = (Classification) value;
+//                setText("<html><b>" + node.getName() + "</b></html>");
+//            }
+//            else if (value instanceof ClassificationTreeModel.Subclass) {
+//                Subclass node = (Subclass) value;
+//                setText(node.getName());                
+//            }
+//            else if (value instanceof ClassificationTreeModel.FramePattern) {
+//                FramePattern node = (FramePattern) value;                
+//                setFont(monospaceFont);
+//                setText(node.getPattern());
+//            }
+//            else if (value instanceof ClassificationTreeModel.RootFilter) {
+//                setText("<html><i>filter</i></html>");
+//            }
+//            else if (value instanceof ClassificationTreeModel.LastQuantor) {
+//                setText("<html><span style=\"color: #B44\"><b>LAST</b></span></html>");
+//            }
+//            else if (value instanceof ClassificationTreeModel.StackFragment) {
+//                setText("<html><i>element</i></html>");
+//            }
+//            else if (value instanceof ClassificationTreeModel.FollowPredicate) {
+//                FollowPredicate fp = (FollowPredicate) value;
+//                if (fp.isNegative()) {
+//                    setText("<html><i>not followed by</i></html>");
+//                }
+//                else {
+//                    setText("<html><i>followed by</i></html>");
+//                }
+//            }
+//            else if (value instanceof ClassificationTreeModel.DisjunctionNode) {
+//                setText("<html><span style=\"color: #B44\"><b>AND</b></span></html>");
+//            }
+//            else if (value instanceof ClassificationTreeModel.ConjunctionNode) {
+//                setText("<html><span style=\"color: #B44\"><b>OR</b></span></html>");
+//            }
+//            
+//            return this;
+//        }
+//    }
 }
